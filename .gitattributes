@@ -1,0 +1,25 @@
+# Normalize all text to LF in the repository, and check out LF in the working
+# tree — overrides the machine's core.autocrlf=true (which would otherwise force
+# CRLF on checkout and corrupt the UTF-8/LF locale bundles).
+* text=auto eol=lf
+
+# Windows shell scripts must stay CRLF (cmd.exe needs it).
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Visual Studio owns these and rewrites them with CRLF; match it so the editor /
+# WinForms designer doesn't mark them modified on every save. (Stored LF in the
+# repo regardless — only the working-tree checkout is CRLF.)
+*.vb       text eol=crlf
+*.vbproj   text eol=crlf
+*.sln      text eol=crlf
+*.resx     text eol=crlf
+*.settings text eol=crlf
+*.myapp    text eol=crlf
+*.config   text eol=crlf
+
+# Binary assets — never touch line endings.
+*.png binary
+*.ico binary
+*.dll binary
+*.snk binary

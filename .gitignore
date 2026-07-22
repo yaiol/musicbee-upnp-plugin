@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio per-user
+*.user
+*.suo
+.vs/
+
+# OS noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+*.cmd
+# claude (agent worktrees, local config) — never publish
+.claude/
