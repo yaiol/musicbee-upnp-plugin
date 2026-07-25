@@ -176,7 +176,7 @@ The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicB
 | Device doesn't see MusicBee at all | Check Windows Firewall for both **private** and **public** networks. The plugin's port (49382 default) needs to be reachable. Restart MusicBee after firewall changes. |
 | Device sees MusicBee but won't play any track | Profile for this device is probably wrong, OR force-native-stream is off and transcoding is failing. Tick **force native stream** in the device's profile and retry. |
 | Audio plays as static / white noise | Try **force little endian for PCM streams** in the device's profile. If that doesn't help, try **do not use RAW PCM**. |
-| Gaps between tracks | Currently the plugin doesn't implement `SetNextAVTransportURI` (gapless). Workaround: tick **output as a continuous stream** in Playback — gapless guaranteed but track metadata and "next" controls break. |
+| Gaps between tracks | True gapless (`SetNextAVTransportURI` / NextURI) runs automatically on devices that support it. If you still hear gaps, the device either doesn't support it or its implementation is buggy — turn off NextURI for that device, or fall back to **output as a continuous stream** in Playback (gapless guaranteed, but track metadata and "next" controls break). |
 | Modern device (2020+) doesn't respond to MusicBee's controls | The `MediaRenderer:3` advertisement fix is in this fork — should work. If not, post a log. |
 | Plugin shows up in MusicBee but Configure doesn't open | Look at MusicBee's `ErrorLog.dat` — the plugin probably crashed on load. Usually a settings-file problem. Delete `%AppData%\MusicBee\UPnPSettings.ini` and reconfigure. |
 | Languages other than English | Currently only English is bundled. The infrastructure is there for adding translations as separate `.resx` files — contributions welcome. |
@@ -187,10 +187,9 @@ The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicB
 
 Honestly, things you should know up front:
 
-- **No gapless playback yet.** The `SetNextAVTransportURI` mechanism (and all its renderer-specific edge cases) is the single biggest feature gap vs UPnP 2025. Tracked, not yet implemented. Continuous-stream is the only current workaround and it's lossy in usability.
-- **No remote control of MusicBee from UPnP.** The 2025 fork has an experimental MediaRenderer that lets you control MusicBee from another UPnP app. Not in scope for this fork.
+- **Gapless is young.** True gapless (`SetNextAVTransportURI` / NextURI) is implemented and runs automatically, but its renderer-specific edge cases have had limited hardware testing — see the hi-fi note below. Continuous-stream remains as a lossy fallback for devices that can't do NextURI.
 - **No podcast support.** UPnP 2025 added Podcasts as a root container; not ported here. (Pull request welcome.)
-- **Limited testing on hi-fi hardware.** Most testing has been against BubbleUPnP and foobar2000. Real renderers (WiiM, Sonos, Cambridge, Eversolo, Marantz, Denon) need community testers.
+- **No hi-fi hardware testing.** Testing was done with BubbleUPnP and foobar2000. True-gapless track-transition detection in particular was validated on BubbleUPnP; other renderers (WiiM, Sonos, Cambridge, Eversolo, Marantz, Denon) handle transitions slightly differently and should be tested by the community. If gapless playback misbehaves on a device, turn off NextURI for it so it falls back to playing one track at a time.
 
 ---
 
