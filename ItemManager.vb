@@ -426,8 +426,10 @@ Partial Public Class Plugin
         ' Episode tuple:
         '   [0] file URL    [1] title    [2] date    [3] description    [4] duration
         '   [5] downloaded? (bool string)    [6] played? (bool string)
-        ' There is no native "author" slot - leave the Artist/AlbumArtist tags blank for
-        ' podcasts (which sort under "Unknown Artist" in any non-Folder grouping).
+        ' There is no native "author" slot, so the show itself is treated as the artist:
+        ' the subscription name is mirrored into Artist/AlbumArtist (+ their Sort variants),
+        ' same as it fills Album - otherwise any artist-based grouping path finds every
+        ' artist slot empty and dead-ends to an empty level. See LoadPodcastFiles.
         Private Const PodcastSubNameIdx As Integer = 1
         Private Const PodcastSubFolderIdx As Integer = 2
         Private Const PodcastEpisodeUrlIdx As Integer = 0
@@ -435,6 +437,16 @@ Partial Public Class Plugin
         ' Episode tuple [2] is the publish date+time (e.g. "02/06/2026 15:03"). The only year
         ' data podcasts carry - parsed into the Year slot so podcast paths can group by year.
         Private Const PodcastEpisodeDateIdx As Integer = 2
+
+        ' Duration (ticks) + FileSize (bytes) as RAW numerics - the negative field code tells
+        ' Library_GetFileTags to return MB's unformatted value (same trick queryFields uses for
+        ' Duration/FileSize). Fetched from a downloaded episode's real file so its DIDL can
+        ' advertise a concrete res@duration/@size; without a duration the renderer (BubbleUPnP)
+        ' re-runs a full-stream ffprobe metadata extraction on every play. Order MUST match the
+        ' read order below (0 = Duration, 1 = FileSize).
+        Private Shared ReadOnly podcastDurationSizeFields() As Plugin.MetaDataType = DirectCast(New Integer() {
+            -MetaDataType.Duration, -MetaDataType.FileSize
+        }, Plugin.MetaDataType())
 
         ' Pull the 4-digit year out of a podcast publish-date string. Tries a culture-aware date
         ' parse first (DD/MM vs MM/DD is irrelevant - the year is the same either way), then falls
@@ -584,15 +596,49 @@ Partial Public Class Plugin
                     tags(MetaDataIndex.PlayCount) = "0"
                     tags(MetaDataIndex.Rating) = "0"
                     tags(MetaDataIndex.Url) = epUrl
+                    ' A downloaded episode is a real file on disk - pull its actual duration
+                    ' (ticks) and size (bytes) from MB so the DIDL advertises a concrete length.
+                    ' Otherwise res@duration is absent and every play triggers a fresh ffprobe
+                    ' metadata extraction on the renderer. Non-downloaded (http) episodes have no
+                    ' local file yet, so they keep the "0" seed and fall back to on-play probing.
+                    If IO.Path.IsPathRooted(epUrl) Then
+                        Try
+                            Dim fileTags() As String = Nothing
+                            If mbApiInterface.Library_GetFileTags(epUrl, podcastDurationSizeFields, fileTags) AndAlso fileTags IsNot Nothing Then
+                                If fileTags.Length > 0 AndAlso Not String.IsNullOrEmpty(fileTags(0)) Then tags(MetaDataIndex.Duration) = fileTags(0)
+                                If fileTags.Length > 1 AndAlso Not String.IsNullOrEmpty(fileTags(1)) Then tags(MetaDataIndex.Size) = fileTags(1)
+                            End If
+                        Catch ex As Exception
+                            LogError(ex, "LoadPodcastFiles.DurationSize", "url=" & epUrl)
+                        End Try
+                        ' Size straight from disk if MB didn't supply it (duration is the one that
+                        ' stops the re-probe; size is emitted alongside it when present).
+                        If tags(MetaDataIndex.Size) = "0" Then
+                            Try
+                                tags(MetaDataIndex.Size) = New IO.FileInfo(epUrl).Length.ToString()
+                            Catch
+                            End Try
+                        End If
+                    End If
                     tags(MetaDataIndex.Title) = epTitle
                     tags(MetaDataIndex.Album) = subName
+                    ' MB's podcast tuple carries no author, but the SHOW is the podcast's
+                    ' artist - so mirror the subscription name into the artist-family slots
+                    ' (Artist / AlbumArtist and their Sort variants), same as it already fills
+                    ' Album. Without this every artist slot is empty, so a browse path that
+                    ' groups podcasts by an artist field (e.g. SortAlbumArtist → slot 26) sees
+                    ' zero distinct values and dead-ends to an empty level. Consistent with
+                    ' Album = show, not invented data.
+                    tags(MetaDataIndex.Artist) = subName
+                    tags(MetaDataIndex.AlbumArtist) = subName
+                    tags(MetaDataIndex.SortArtist) = subName
+                    tags(MetaDataIndex.AlbumArtistSort) = subName
                     ' Publish year (from ep[2]) into the Year slot so a podcast path can group
                     ' episodes by year - the only year data the subscription tuple carries.
                     If episode.Length > PodcastEpisodeDateIdx Then
                         Dim yr As String = ExtractYear(episode(PodcastEpisodeDateIdx))
                         If yr.Length > 0 Then tags(MetaDataIndex.Year) = yr
                     End If
-                    ' No author slot in MB's podcast tuple - Artist/AlbumArtist stay empty.
                     ' Synthetic Folder slot - picked up by the "Folder" field name when the
                     ' user wires it into a grouping path (e.g. Podcasts → group by Folder).
                     tags(MetaDataIndex.ExtraField1) = subFolder
@@ -1967,20 +2013,40 @@ Partial Public Class Plugin
             If Not fileLookupLoaded Then
                 LoadLibrary()
             End If
+            If TryResolveFileInfo(objectId, url, duration) Then Return True
+            ' Miss: a DIRECT play reaches GetFile with no prior Browse - e.g. BubbleUPnP's
+            ' "Recently Played" list (or a cast) requests the track by its id straight after a
+            ' restart. The lazy endpoints (podcast/inbox/audiobook/radio) only hash their tracks
+            ' into fileLookup when that endpoint is browsed, so the id is unknown and GetFile
+            ' 404s ("Bad id"). Force-load the bounded ones once and retry before giving up.
+            EnsureDirectAccessEndpoints()
+            Return TryResolveFileInfo(objectId, url, duration)
+        End Function
+
+        Private Function TryResolveFileInfo(objectId As String, ByRef url As String, ByRef duration As TimeSpan) As Boolean
             Dim tags() As String = Nothing
             SyncLock fileLookup
-                If Not fileLookup.TryGetValue(objectId, tags) Then
-                    Return False
-                Else
-                    url = tags(MetaDataIndex.Url)
-                    Dim durationValue As Long
-                    If Long.TryParse(tags(MetaDataIndex.Duration), durationValue) Then
-                        duration = New TimeSpan(durationValue)
-                    End If
+                If Not fileLookup.TryGetValue(objectId, tags) Then Return False
+                url = tags(MetaDataIndex.Url)
+                Dim durationValue As Long
+                If Long.TryParse(tags(MetaDataIndex.Duration), durationValue) Then
+                    duration = New TimeSpan(durationValue)
                 End If
             End SyncLock
             Return True
         End Function
+
+        ' Force-load the bounded lazy endpoints so their tracks are present in fileLookup for a
+        ' DIRECT id access that skipped Browse (see TryGetFileInfo). Each Ensure* is a one-time
+        ' fetch guarded by its loaded flag, so this is a no-op once the endpoint has been browsed.
+        ' Music is deliberately NOT force-loaded: it is not a bounded list, its tracks enter
+        ' fileLookup only as they are browsed. (audiobook + inbox share one partition pass.)
+        Private Shared Sub EnsureDirectAccessEndpoints()
+            EnsureLazyEndpointInMemory("podcast")
+            EnsureLazyEndpointInMemory("audiobook")
+            EnsureLazyEndpointInMemory("inbox")
+            EnsureLazyEndpointInMemory("radio")
+        End Sub
 
         Public Function TryGetThumbnailFile(objectId As String, ByRef pictureUrl As String) As Boolean
             Dim tags() As String = Nothing
@@ -2197,6 +2263,112 @@ Partial Public Class Plugin
             Return True
         End Function
 
+        ' Class-ONLY search - a bare class predicate with NO "dc:title contains" term.
+        ' BubbleUPnP's "Random Tracks" and "Random Albums" virtual folders fire these:
+        '   upnp:class derivedfrom "object.item.audioItem"    → random tracks
+        '   upnp:class = "object.container.album.musicAlbum"   → random albums
+        ' They PAGE at random offsets (startingIndex/requestedCount), so - unlike the title
+        ' search above, which caps at the first N - this MUST honour the requested slice and
+        ' report an accurate totalMatches, or the client picks an offset we never serve and
+        ' shows nothing. Data comes from the lazy MB query path: the eager `musicFiles` list is
+        ' empty under the lazy design, which is exactly why the legacy fall-through returned
+        ' zero. Returns False when the criteria isn't a class-only query we serve so the caller
+        ' falls through to the legacy handler.
+        Private Function HandleClassOnlySearch(headers As Dictionary(Of String, String), containerId As String, searchCriteria As String, filter As String, startingIndex As Integer, requestedCount As Integer, ByRef result As String, ByRef numberReturned As String, ByRef totalMatches As String) As Boolean
+            If String.IsNullOrEmpty(searchCriteria) Then Return False
+            ' A title term is HandleLazySearch's job - only bare class queries land here.
+            If ExtractTitleContainsTerm(searchCriteria).Length > 0 Then Return False
+            Dim wantsAlbums As Boolean = IsAlbumClassQuery(searchCriteria)
+            Dim wantsTracks As Boolean = (Not wantsAlbums) AndAlso searchCriteria.IndexOf("audioItem", StringComparison.OrdinalIgnoreCase) >= 0
+            If Not wantsAlbums AndAlso Not wantsTracks Then Return False
+            ' Scope: only a music / filter container exposes a queryable filter chain. Any other
+            ' container (incl. in-memory endpoints) degrades to a global music search - same
+            ' policy as HandleLazySearch, since podcast/inbox/etc. aren't SmartPlaylist-queryable.
+            Dim scopeFilters As New List(Of LazyFilter)
+            If Not String.IsNullOrEmpty(containerId) AndAlso containerId.StartsWith("L:", StringComparison.OrdinalIgnoreCase) Then
+                Dim ep As String = Nothing
+                Dim pIdx As Integer
+                Dim parsed As List(Of LazyFilter) = Nothing
+                If TryParseLazyId(containerId, ep, pIdx, parsed) Then
+                    Dim epLower As String = If(ep, "").ToLowerInvariant()
+                    If epLower = "music" OrElse epLower.StartsWith("filter:", StringComparison.OrdinalIgnoreCase) Then
+                        For Each f As LazyFilter In RealFiltersOnly(parsed)
+                            scopeFilters.Add(f)
+                        Next
+                    End If
+                End If
+            End If
+            Dim host As String
+            Dim hostUrl As String = If(Not headers.TryGetValue("host", host), PrimaryHostUrl, "http://" & host)
+            Dim filterSet As HashSet(Of String) = Nothing
+            If filter <> "*" Then
+                filterSet = New HashSet(Of String)(filter.Split(New Char() {","c}, StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase)
+            End If
+            Dim text As New StringBuilder(16384)
+            Dim xmlSettings As New XmlWriterSettings With {.OmitXmlDeclaration = True, .Indent = False}
+            Dim emitted As Integer = 0
+            Dim total As Integer = 0
+            Using writer As XmlWriter = XmlWriter.Create(text, xmlSettings)
+                writer.WriteStartElement("DIDL-Lite", "urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/")
+                writer.WriteAttributeString("xmlns", "dc", Nothing, "http://purl.org/dc/elements/1.1/")
+                writer.WriteAttributeString("xmlns", "upnp", Nothing, "urn:schemas-upnp-org:metadata-1-0/upnp/")
+                writer.WriteAttributeString("xmlns", "pv", Nothing, "http://www.pv.com/pvns/")
+                If wantsAlbums Then
+                    ' Album LIST via the lazy album grouping (cached, library-wide the first time).
+                    Dim musicBinding As EndpointBinding = View.GetBinding("music")
+                    Dim groupBy As Plugin.AlbumGroupField() = Nothing
+                    If musicBinding IsNot Nothing AndAlso musicBinding.Paths IsNot Nothing AndAlso musicBinding.Paths.Length > 0 Then
+                        groupBy = musicBinding.Paths(0).AlbumGroupBy
+                    End If
+                    Dim albums As List(Of LazyAlbumEntry) = SortLazyAlbums(GetLazyAlbumsForFilterIn("music", scopeFilters, groupBy), groupBy)
+                    total = albums.Count
+                    ' Fresh search (page 0) resets the tap-through cache; later pages accumulate.
+                    If startingIndex = 0 Then
+                        SyncLock searchAlbumResultTracks
+                            searchAlbumResultTracks.Clear()
+                        End SyncLock
+                    End If
+                    Dim endIdx As Integer = Math.Min(startingIndex + requestedCount - 1, total - 1)
+                    For i As Integer = startingIndex To endIdx
+                        Dim a As LazyAlbumEntry = albums(i)
+                        ' Tracks for THIS album = scope + the album's identity fields. Bounded to one
+                        ' album, so the per-album query is cheap even though the list scan was global.
+                        ' Cached under a stable "Ssrch_alb_<i>" id so the existing Browse route
+                        ' (searchAlbumResultTracks) serves the tracks when the user taps the album.
+                        Dim albumFilters As New List(Of LazyFilter)(scopeFilters)
+                        albumFilters.AddRange(a.Key)
+                        Dim tracks As List(Of String()) = GetLazyTracksForFilterIn("music", albumFilters)
+                        Dim albumId As String = "Ssrch_alb_" & i.ToString()
+                        SyncLock searchAlbumResultTracks
+                            searchAlbumResultTracks(albumId) = tracks
+                        End SyncLock
+                        WriteContainerDIDL(writer, hostUrl, filterSet, albumId, "0", tracks.Count.ToString(), a.Title, "object.container.album.musicAlbum", tracks)
+                        emitted += 1
+                    Next
+                Else
+                    ' Track LIST: the scope's whole track set, sliced to the requested page.
+                    Dim query As String = LazyBuildFilterQueryFor("music", scopeFilters)
+                    Dim urls() As String = Nothing
+                    LazyQueryFilesEx(query, urls, "Search class-only tracks")
+                    total = If(urls Is Nothing, 0, urls.Length)
+                    Dim endIdx As Integer = Math.Min(startingIndex + requestedCount - 1, total - 1)
+                    Dim slice As New List(Of String())
+                    SyncLock fileLookup
+                        For i As Integer = startingIndex To endIdx
+                            Dim tags() As String = LoadFile(urls(i))
+                            If tags IsNot Nothing Then slice.Add(tags)
+                        Next
+                    End SyncLock
+                    emitted = WriteAudioFilesDIDL(writer, hostUrl, filterSet, "object.item.audioItem.musicTrack", "0", slice, 0, slice.Count)
+                End If
+                writer.WriteEndElement()
+            End Using
+            numberReturned = emitted.ToString()
+            totalMatches = total.ToString()
+            result = text.ToString()
+            Return True
+        End Function
+
         ' Extract the TERM in a "dc:title contains "TERM"" subexpression. Returns ""
         ' if the criteria doesn't include the pattern. Case-insensitive on the
         ' field name; preserves the term's original casing.
@@ -2227,6 +2399,10 @@ Partial Public Class Plugin
                 ' "(upnp:class ... and dc:title contains "TERM")" queries for both
                 ' track and album classes). Per-client scope substitution already
                 ' applied upstream in ContentDirectoryService.ResolveSearchContainer.
+            ElseIf HandleClassOnlySearch(headers, containerId, searchCriteria, filter, startingIndex, requestedCount, result, numberReturned, totalMatches) Then
+                ' Handled: bare class query with no title term - BubbleUPnP's "Random Tracks"
+                ' / "Random Albums", served (paged) from the lazy MB query path. Without this
+                ' it fell through below to the empty `musicFiles` list and returned zero.
             Else
                 Dim host As String
                 Dim hostUrl As String = If(Not headers.TryGetValue("host", host), PrimaryHostUrl, "http://" & host)
@@ -3864,17 +4040,27 @@ Partial Public Class Plugin
             Dim real As List(Of LazyFilter) = RealFiltersOnly(filters)
             For Each f As LazyFilter In real
                 Dim mdi As MetaDataIndex = FieldNameToMetaDataIndex(f.Field)
-                If CInt(mdi) <= 0 OrElse CInt(mdi) >= tags.Length Then Return False
-                Dim raw As String = If(tags(CInt(mdi)), "")
-                If String.IsNullOrEmpty(raw) Then Return False
-                Dim hit As Boolean = False
-                For Each piece As String In raw.Split(New String() {"; "}, StringSplitOptions.RemoveEmptyEntries)
-                    If String.Equals(piece.Trim(), f.Value, StringComparison.CurrentCultureIgnoreCase) Then
-                        hit = True
-                        Exit For
-                    End If
-                Next
-                If Not hit Then Return False
+                Dim raw As String = ""
+                If CInt(mdi) > 0 AndAlso CInt(mdi) < tags.Length Then raw = If(tags(CInt(mdi)), "")
+                If String.IsNullOrEmpty(f.Value) Then
+                    ' Empty filter value = "this tag is empty for the track". Album grouping
+                    ' collapses tracks with no value for a group-by field (e.g. an untagged
+                    ' YearOnly, common in the inbox) under the empty key, so drilling into
+                    ' such an album emits an empty-valued filter. It must MATCH the empty
+                    ' tag, not reject it (the old unconditional empty-raw → False made every
+                    ' no-year inbox album browse to zero tracks). A non-empty tag fails it.
+                    If Not String.IsNullOrEmpty(raw) Then Return False
+                Else
+                    If String.IsNullOrEmpty(raw) Then Return False
+                    Dim hit As Boolean = False
+                    For Each piece As String In raw.Split(New String() {"; "}, StringSplitOptions.RemoveEmptyEntries)
+                        If String.Equals(piece.Trim(), f.Value, StringComparison.CurrentCultureIgnoreCase) Then
+                            hit = True
+                            Exit For
+                        End If
+                    Next
+                    If Not hit Then Return False
+                End If
             Next
             Return True
         End Function

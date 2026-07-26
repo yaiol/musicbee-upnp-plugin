@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1 - 2026-07-26
+- Podcast episodes now advertise their real duration and file size in the UPnP metadata, so renderers (e.g. BubbleUPnP) no longer re-probe the whole stream on every play
+- Podcasts now appear under artist-based browse paths — the show name fills the Artist/AlbumArtist slots instead of leaving them empty, which previously dead-ended those groupings to an empty level
+- Direct playback of a track that was never browsed (e.g. BubbleUPnP "Recently Played" after a restart) now force-loads the bounded endpoints and resolves the file instead of failing with "Bad id"
+- BubbleUPnP "Random Tracks" and "Random Albums" now return results (paged from the lazy query path) instead of an empty list
+- Drilling into an album grouped on an empty tag value (e.g. an untagged year in the inbox) now lists its tracks instead of showing nothing
+
 ## 2.0.0 - 2026-07-22
 
 First release of the open-source yaiol fork of the MusicBee UPnP plugin. Every point below carries its full What / Why in the release notes (`pub/live/site/en/releases.md`).
