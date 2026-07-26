@@ -195,7 +195,7 @@ Honestly, things you should know up front:
 
 ## 7. Architecture
 
-A single VB.NET assembly — `mb_UPnP_yaiol.dll`, targeting **.NET Framework 4.0 Client Profile** — loaded in-process by MusicBee. No external services, no NuGet runtime dependencies; the only non-framework reference is the COM-interop `Interop.UPNPLib.dll` generated from Windows' built-in `upnp.dll`.
+A single VB.NET assembly — `mb_UPnP_yaiol.dll`, targeting **.NET Framework 4.7.2** (x86) — loaded in-process by MusicBee. No external services, no NuGet runtime dependencies; the only non-framework reference is the COM-interop `Interop.UPNPLib.dll`, a thin shim generated from Windows' built-in `upnp.dll` (the "UPnP 1.0 Type Library") and used only for router port-forwarding. Because that COM library is part of Windows, nothing beyond the single DLL ships to users.
 
 ### The UPnP / DLNA layering
 
@@ -239,13 +239,13 @@ The assembly is deliberately named `mb_UPnP_yaiol.dll` and announces itself as *
 
 ## 9. Building from source
 
-Requires Visual Studio 2019+ (Community is fine), .NET Framework 4.0 Client Profile, and the COM-interop `Interop.UPNPLib.dll` (generate via `TlbImp.exe C:\Windows\System32\upnp.dll /out:bin\Interop.UPNPLib.dll /namespace:UPNPLib` from a Developer Command Prompt).
+Requires Visual Studio 2019+ (Community is fine) and the .NET Framework 4.7.2 targeting pack. The COM-interop `Interop.UPNPLib.dll` is **committed to the repo** (under `bin/`), so a fresh clone builds with no extra setup. If you ever need to regenerate it, run `TlbImp.exe C:\Windows\System32\upnp.dll /out:bin\Interop.UPNPLib.dll /namespace:UPNPLib` from a Developer Command Prompt.
 
 ```
 main/MusicBeeUpnp.sln
 ```
 
-Build configuration: `Debug | x86`. Output: `main/bin/Debug/mb_UPnP_yaiol.dll`.
+Build configuration: `Debug | x86` for local work → `main/bin/Debug/mb_UPnP_yaiol.dll`. Published releases are built `Release | x86` by CI: pushing a `v*` tag runs `.github/workflows/release.yml`, which builds on a Windows runner and creates the GitHub release with the DLL attached and the matching `CHANGELOG.md` section as the notes.
 
 ---
 
