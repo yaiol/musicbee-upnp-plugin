@@ -1,0 +1,65 @@
+name: Release
+
+# Fires when a version tag is pushed (e.g. `git push origin v2.0.2`).
+# Builds the plugin on a Windows runner and publishes a GitHub release with
+# the compiled DLL attached and the matching CHANGELOG.md section as the body.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to create the release
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # .NET Framework 4.7.2, x86 — the committed bin/Interop.UPNPLib.dll resolves
+      # the UPNPLib COM reference by HintPath, so no interop generation is needed.
+      - name: Build (Release)
+        run: msbuild MusicBeeUpnp.vbproj /p:Configuration=Release /v:minimal /nologo
+
+      - name: Extract release notes from CHANGELOG.md
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $ver = $tag -replace '^v', ''
+          $verEsc = [regex]::Escape($ver)
+          $header = '^##\s+' + $verEsc + '(\s|$)'
+          $lines = Get-Content -Path 'CHANGELOG.md' -Encoding utf8
+          $out = New-Object System.Collections.Generic.List[string]
+          $inBlock = $false
+          foreach ($line in $lines) {
+            if (-not $inBlock -and $line -match $header) { $inBlock = $true; continue }
+            if ($inBlock -and $line -match '^##\s') { break }
+            if ($inBlock) { $out.Add($line) }
+          }
+          $body = ($out -join "`n").Trim()
+          if ([string]::IsNullOrWhiteSpace($body)) { $body = "Release $ver" }
+          Set-Content -Path 'notes.md' -Value $body -Encoding utf8
+          Write-Host "---- notes.md ----"
+          Get-Content notes.md
+
+      - name: Create / update GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $ver = $tag -replace '^v', ''
+          $title = "MusicBee UPnP Plugin $ver"
+          $asset = "bin/Release/mb_UPnP_yaiol.dll"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit   $tag --title $title --notes-file notes.md
+            gh release upload $tag $asset --clobber
+          } else {
+            gh release create $tag --title $title --notes-file notes.md $asset
+          }

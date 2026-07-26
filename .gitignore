@@ -1,6 +1,11 @@
 # Build output
-bin/
+bin/*
 obj/
+# ...except the COM interop wrapper for the Windows "UPnP 1.0 Type Library"
+# (used by UpnpControlPoint.vb for router port-forwarding). It's a generated
+# 15 KB shim over a built-in Windows component — committed so a cloud build
+# (GitHub Actions) can resolve the reference without regenerating it.
+!bin/Interop.UPNPLib.dll
 
 # Visual Studio per-user
 *.user
