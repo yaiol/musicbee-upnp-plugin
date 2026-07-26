@@ -8,7 +8,7 @@ This README explains what every option in the settings dialog actually does. UPn
 
 ## 1. What this plugin does
 
-UPnP/DLNA is a network protocol that lets devices on your local network share and play media without any cloud or login. This plugin gives MusicBee two roles:
+UPnP/DLNA is a network protocol that lets devices on your local network share and play media without any cloud or login. This plugin gives MusicBee three roles, each switched on independently on the **General** tab:
 
 ### Role A — "Library server"
 
@@ -22,7 +22,13 @@ You can pick a UPnP device on your network as MusicBee's output. Press Play in M
 
 This is the **outgoing** direction — MusicBee pushes to a renderer.
 
-You can use one role, the other, or both. The settings dialog has separate sections for each.
+### Role C — "Renderer" (MusicBee *is* the player)
+
+The reverse of Role A: a controller app on your phone (BubbleUPnP and friends) picks your desktop MusicBee as the thing that *plays*, then drives it — play, pause, skip, seek, volume. Your phone becomes a remote for the music already on your PC.
+
+This role is **off by default**, because switching it on lets anything on your network start playback on your PC. Give it a name (the **renderer name** field) so you can tell machines apart in your phone's play-to list.
+
+You can use any combination of the three. The settings dialog only shows the tabs the roles you enabled actually need.
 
 ---
 
@@ -48,17 +54,24 @@ You can use one role, the other, or both. The settings dialog has separate secti
 
 | Option | What it does | When to change |
 |---|---|---|
-| **language** | Picks the plugin's own UI language. "Auto" follows MusicBee. | Only change if MusicBee is in one language but you want the plugin in another. |
+| **language** | Picks the plugin's own UI language (22 available). "Auto" follows MusicBee. | Only change if MusicBee is in one language but you want the plugin in another. |
+| **UPnP Server: enable UPnP devices to browse and play from the MusicBee library** | Role A — share your library. **On** by default. | Off if you never browse MusicBee from another device. |
+| **UPnP Control Point: add network UPnP/DLNA renderers as MusicBee output devices** | Role B — play *out* to a speaker/streamer. **On** by default. | Off if you don't push from MusicBee to anything. |
+| **UPnP Renderer: enable other apps to play to MusicBee** | Role C — let a phone play *to* MusicBee. **Off** by default; needs a restart to take effect. | On if you want your phone to drive playback on this PC. |
+| **renderer name** | The name this PC shows up as in your phone's play-to list. Takes effect immediately. | When several PCs run MusicBee and you need to tell them apart. |
 | **server name** | The name your other devices see when they discover MusicBee on the network. | Whatever you want. Default is fine. |
 | **IP address** | Which network interface MusicBee binds the server to. "Automatic" picks all interfaces. | Multi-network PCs (Wi-Fi + Ethernet + VPN): pick the one your devices are on. |
-| **port** | TCP port for the HTTP server. 49382 by default. | Only if another app is already using 49382, or your firewall demands a specific port. |
+| **port** | TCP port for the HTTP server. 9779 by default. If that port is already taken, the plugin scans upward for a free one automatically. | Only if another app is already using 9779, or your firewall demands a specific port. |
 
 ### Playback (outgoing — MusicBee → renderer)
 
+> The on/off switch for this role lives on the **General** tab (*UPnP Control Point*); this tab holds how it streams.
+
 | Option | What it does | When to change |
 |---|---|---|
-| **enable MusicBee to play to a UPnP device** | Turns the controller role on/off. When on, UPnP devices appear in MusicBee's Player settings as output choices. | Off if you don't push from MusicBee to anything. |
 | **output as a continuous stream** | Sends one infinite audio stream instead of one file per track. Eliminates inter-track gaps. **Tradeoff**: the renderer shows the FIRST track's metadata for the entire session, "next track" buttons stop working, native streaming is disabled (everything must be transcoded). | Last-resort gapless workaround. Better to use a renderer that supports `SetNextAVTransportURI` (NextURI). |
+| **network is bandwidth constrained** | When transcoding kicks in, use the device profile's *lossy* output (MP3/AAC/Ogg) regardless. | On if you stream over a slow Wi-Fi link. |
+| **force native stream for radio** | Hand radio stations to the device untouched, bypassing the transcoder. **On** by default. | Off only if a device can't play a station's native format. |
 
 ### Library (incoming — UPnP clients → MusicBee)
 
@@ -80,9 +93,9 @@ The plugin looks at the `User-Agent` header sent by the device. If it matches a 
 
 #### How to find your device's user-agent
 
-1. Open the **Diagnostics** section, tick **log debug information**, click **Save**.
+1. Open the **Debug** tab, tick **log debug information**, click **Save**.
 2. Play something from the device.
-3. Reopen the settings, go to Diagnostics, click **View**. The log shows the device's user-agent on an "useragent=" line.
+3. Reopen the settings, go to Debug, click **View**. The log shows the device's user-agent on an "useragent=" line.
 
 #### Per-profile fields
 
@@ -114,7 +127,7 @@ The plugin decides "transcode or not" by walking a fixed precedence chain. **Hig
 
 | Priority | Setting | Effect |
 |---|---|---|
-| 1 (highest) | **Force transcoding** (Diagnostics, global) | Always transcode. Overrides everything below. Rarely useful — mostly a diagnostic toggle. |
+| 1 (highest) | **Force transcoding** (per profile, on its **Transcoding** sub-tab) | Always transcode for this device. Overrides everything below. The dialog treats it and force-native as **mutually exclusive** — ticking one unticks the other — so in practice you pick a lane per device. |
 | 2 | **Force native stream** (per profile, default **ON**) | Never transcode for this device. **Suppresses rules 3-5 entirely.** Send the original file bytes regardless of format mismatch, DSP, ReplayGain, sample-rate limits. |
 | 3 | **EQ/DSP** + **ReplayGain** (Library) | Force transcoding so the audio can be processed. **Silently ignored if rule 2 wins.** |
 | 4 | **Sample rate / bit depth / stereo-only** in the device profile | Out-of-range source → transcode to fit. **Silently ignored if rule 2 wins.** |
@@ -124,16 +137,38 @@ The plugin decides "transcode or not" by walking a fixed precedence chain. **Hig
 
 **If you want EQ/DSP or ReplayGain to actually apply**: turn off force-native-stream **on the profile of the device you're streaming to**. (Per-profile, not global — so you can keep force-native on for your hi-fi rig and off for a portable device that needs MusicBee's ReplayGain.)
 
-**If you want to test "what does the renderer do with a fresh transcode"**: tick force-transcoding (global, Diagnostics). It overrides everything including force-native.
+**If you want to test "what does the renderer do with a fresh transcode"**: tick force-transcoding on that device's profile (Device Profiles → Transcoding). It wins over force-native — and the dialog unticks force-native for you, since the two are mutually exclusive.
 
-### Diagnostics
+### View (which nodes appear on the network, and how each is shaped)
+
+The whole exposed tree as a checklist — Music, your filters, Podcasts, Audiobooks, Radio, the Inbox and Playlists. The pattern is always: **tick the nodes you want to act on**, then use the controls beside the tree to act on all of them at once.
+
+| Action | What it does |
+|---|---|
+| **visible / hidden** | Whether the node appears at all on the other device. Hide what you never browse. |
+| **pin to the root** | Lift a node to the top level instead of leaving it nested — e.g. put your Jazz filter beside Music. |
+| **apply a path template** | Give the node a *discovery path* (see the Paths tab) — the route you drill down through it. Only templates that fit the node can be applied; the rest grey out. |
+
+Radio and Podcasts are **permanently paired** with their own category templates, so you reshape them on the Paths tab rather than applying anything here.
+
+### Paths (discovery path templates)
+
+A **discovery path** is the route a browser walks inside a node: `Album Artist → Album → Tracks`, a flat track list, by Genre, by Year… A path is one or more **levels** (the field each groups by) ending in a **leaf** (albums-then-tracks, or a flat list). A node can carry several paths, so it offers more than one way in.
+
+Templates are listed in two bands: **Standard** — where your own templates live and every new one is created — and **Reserved**, holding the Radio and Podcasts templates. The available grouping fields follow the band, because not every field means something for every node (a radio station has no album; a podcast episode has a subscription, a folder and a publish date but no album artist).
+
+When a path ends in the **Album → Tracks** leaf, you also choose what counts as one album — pick one or more fields (Album, Sort Album, Year, Album Artist), each sortable ascending or descending, which together decide what fuses into one album, how its heading reads, and the order albums appear.
+
+Defaults are sensible (new filters group by album artist; playlists and the Inbox get flat-ish defaults), so most people never open this tab.
+
+### Debug
 
 | Option | What it does | When to use |
 |---|---|---|
-| **network is bandwidth constrained** | If transcoding kicks in, use the device profile's *lossy* output (MP3/AAC/Ogg) regardless. | On if you stream over a slow Wi-Fi link. |
 | **log debug information** | Writes every SOAP call, every codec decision, every error to a log file. | On while troubleshooting; off otherwise (the log grows fast). |
-| **View** | Opens the log file in Notepad. | After enabling logging. |
-| **force transcoding (global setting — every stream is transcoded)** | Every track gets re-encoded through the profile's transcode codec, no matter what. | Rarely useful — only for diagnosing whether the source format is the problem. |
+| **clear log on plugin startup** | Starts a fresh log each time MusicBee launches. | On when logging long-term, so the file doesn't grow forever. |
+| **View** / **Clear log** | Open the log in Notepad, or empty it. | After enabling logging. |
+| **Read last query** / **Run query** / **Fetch tags for first 5** | Developer tools — replay the last library query, run one by hand, inspect the tags returned. | Diagnosing why a node browses wrong. Most users never touch these. |
 
 ---
 
@@ -149,9 +184,13 @@ This means a 300,000-track library doesn't dump you into a single overwhelming "
 
 The filters are read live from `%AppData%\MusicBee\Filters\*.xautopf` — exactly the files MusicBee itself uses, so they stay in sync without configuration.
 
-### Inside each filter: `Album Artist → Album → Tracks`
+### The whole library is published, not just "Music"
 
-Tapping a filter root drops you into the **Album Artist** list, then **Album**, then **Tracks**. Track ordering inside each album is correct (Disc/Track number), not alphabetical or random.
+Podcasts, Audiobooks, Radio stations, the Inbox and Playlists each appear as their own browsable container alongside the music — and each can be shown, hidden or pinned to the root individually (the **View** tab). Podcast subscriptions open to their episodes, with subscription artwork carried through. Most servers expose a flat music library and nothing else.
+
+### Every node gets its own shape
+
+Tapping a filter root drops you into **Album Artist → Album → Tracks** by default — with correct Disc/Track ordering inside each album, not alphabetical or random. But that shape is a *choice*: each node carries its own discovery path (see the **Paths** tab), so a playlist can browse as a flat ordered list, a filter by Genre or Year, and podcasts by subscription.
 
 ### Artists sorted by `Sort Album Artist`, not by display name
 
@@ -173,13 +212,13 @@ The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicB
 
 | Symptom | First thing to try |
 |---|---|
-| Device doesn't see MusicBee at all | Check Windows Firewall for both **private** and **public** networks. The plugin's port (49382 default) needs to be reachable. Restart MusicBee after firewall changes. |
+| Device doesn't see MusicBee at all | Check Windows Firewall for both **private** and **public** networks. The plugin's port (9779 default) needs to be reachable. Restart MusicBee after firewall changes. |
 | Device sees MusicBee but won't play any track | Profile for this device is probably wrong, OR force-native-stream is off and transcoding is failing. Tick **force native stream** in the device's profile and retry. |
 | Audio plays as static / white noise | Try **force little endian for PCM streams** in the device's profile. If that doesn't help, try **do not use RAW PCM**. |
 | Gaps between tracks | True gapless (`SetNextAVTransportURI` / NextURI) runs automatically on devices that support it. If you still hear gaps, the device either doesn't support it or its implementation is buggy — turn off NextURI for that device, or fall back to **output as a continuous stream** in Playback (gapless guaranteed, but track metadata and "next" controls break). |
 | Modern device (2020+) doesn't respond to MusicBee's controls | The `MediaRenderer:3` advertisement fix is in this fork — should work. If not, post a log. |
 | Plugin shows up in MusicBee but Configure doesn't open | Look at MusicBee's `ErrorLog.dat` — the plugin probably crashed on load. Usually a settings-file problem. Delete `%AppData%\MusicBee\UPnPSettings.ini` and reconfigure. |
-| Languages other than English | Currently only English is bundled. The infrastructure is there for adding translations as separate `.resx` files — contributions welcome. |
+| Languages other than English | 22 languages ship with the plugin (`main/locales/*.json`). Set **language** on the General tab, or leave it on "Auto" to follow MusicBee. |
 
 ---
 
@@ -188,7 +227,6 @@ The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicB
 Honestly, things you should know up front:
 
 - **Gapless is young.** True gapless (`SetNextAVTransportURI` / NextURI) is implemented and runs automatically, but its renderer-specific edge cases have had limited hardware testing — see the hi-fi note below. Continuous-stream remains as a lossy fallback for devices that can't do NextURI.
-- **No podcast support.** UPnP 2025 added Podcasts as a root container; not ported here. (Pull request welcome.)
 - **No hi-fi hardware testing.** Testing was done with BubbleUPnP and foobar2000. True-gapless track-transition detection in particular was validated on BubbleUPnP; other renderers (WiiM, Sonos, Cambridge, Eversolo, Marantz, Denon) handle transitions slightly differently and should be tested by the community. If gapless playback misbehaves on a device, turn off NextURI for it so it falls back to playing one track at a time.
 
 ---
@@ -209,14 +247,15 @@ UPnP is the generic plumbing; DLNA is the interop layer on top of it. The plugin
 | **DIDL-Lite** | The XML that describes tracks / albums / artists in browse responses (album art via `upnp:albumArtURI`). |
 | **DLNA conventions** | `DLNA.ORG_PN` profile codes, `contentFeatures.dlna.org`, seek flags, and the per-device transcode-profile system that negotiates formats. It declares `DMS-1.50` / `DMR-1.50` — **DLNA-compatible, not DLNA-Certified**. |
 
-### The two roles
+### How the three roles map onto UPnP
 
-The plugin presents **two independent UPnP root devices**, both hosted on one shared HTTP server / port:
+The plugin presents **two independent UPnP root devices**, both hosted on one shared HTTP server / port — plus a control point, which is a *client* and therefore not a device at all:
 
-- **MediaServer** (DMS) — the "library server" role. Implements `ContentDirectory` (browse the library) + `ConnectionManager`. This is the mature side.
-- **MediaRenderer** (DMR) — the "player / controller" role. Implements `AVTransport` + `RenderingControl`. Phase 1: it advertises `DMR-1.50` but eventing is subscribe-time-only (no live push) — polling control points work, full GENA push is future work.
+- **MediaServer** (DMS) — Role A, the library server. Implements `ContentDirectory` (browse the library) + `ConnectionManager`. This is the mature side.
+- **MediaRenderer** (DMR) — Role C, MusicBee as the player. Implements `AVTransport` + `RenderingControl`. Phase 1: it advertises `DMR-1.50` but eventing is subscribe-time-only (no live push) — polling control points work, full GENA push is future work.
+- **Control point** — Role B, MusicBee driving someone else's renderer. Discovers renderers by M-SEARCH and calls *their* services; it publishes nothing itself. Accepts `MediaRenderer:1`, `:2` and `:3` advertisements, which is what makes post-2020 devices work.
 
-Each role is independently gated by a setting, so you can run server-only, renderer-only, or both.
+Each role is independently gated by its own setting, so any combination runs. The renderer is a **separate root device with its own UUID and description document** (`/renderer.xml`), not a child of the server — combined-device control points would otherwise double-list it.
 
 ### Coexists with the original plugin
 
