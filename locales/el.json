@@ -128,5 +128,7 @@
   "btnHelp": "Βοήθεια",
   "chkLibViwVisible": "Ορατό",
   "chkLibViwTopLevel": "Κορυφαίο επίπεδο",
-  "lblLibPthAlbumGroup": "Ομαδοποίηση άλμπουμ κατά:"
+  "lblLibPthAlbumGroup": "Ομαδοποίηση άλμπουμ κατά:",
+  "cboLibOptRandomSourceAll": "Όλη η Μουσική",
+  "lblLibOptRandomSource": "Τυχαία αναπαραγωγή από:"
 }

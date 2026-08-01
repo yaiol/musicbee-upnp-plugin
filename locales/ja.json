@@ -128,5 +128,7 @@
   "btnHelp": "ヘルプ",
   "chkLibViwVisible": "表示",
   "chkLibViwTopLevel": "トップレベル",
-  "lblLibPthAlbumGroup": "アルバムをグループ化:"
+  "lblLibPthAlbumGroup": "アルバムをグループ化:",
+  "cboLibOptRandomSourceAll": "すべての音楽",
+  "lblLibOptRandomSource": "ランダム再生元:"
 }

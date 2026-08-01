@@ -128,5 +128,7 @@
   "btnHelp": "Aiuto",
   "chkLibViwVisible": "Visibile",
   "chkLibViwTopLevel": "Livello superiore",
-  "lblLibPthAlbumGroup": "Raggruppa album per:"
+  "lblLibPthAlbumGroup": "Raggruppa album per:",
+  "cboLibOptRandomSourceAll": "Tutta la musica",
+  "lblLibOptRandomSource": "Riproduzione casuale da:"
 }

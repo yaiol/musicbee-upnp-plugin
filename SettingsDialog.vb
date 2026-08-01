@@ -47,6 +47,14 @@ Partial Friend NotInheritable Class SettingsDialog
         ' "Server settings…" is the only genuine section header here; the three role checkboxes
         ' below are peers and render in the normal font (their old bold-header styling is dropped).
         Me.lblSrvSettings.Font = boldFont
+        ' ⚠ CLAUDE: a section header must derive its bold FROM Me.Font, never hardcode a family
+        ' or size. Me.Font is MusicBee's own UI font (set just above), so a designer-baked
+        ' "Microsoft Sans Serif, 7.8pt, Bold" does not follow it - the label keeps the design-time
+        ' font while every other control switches, and it reads as a foreign typeface at runtime.
+        ' These two carried exactly that and looked wrong on screen while looking identical in the
+        ' VS designer, which is what made it hard to see. Same rule for any new header.
+        Me.lblDevCapabilities.Font = boldFont
+        Me.lblDevProblems.Font = boldFont
         Me.chkEnableController.Checked = Plugin.Settings.EnablePlayToDevice
         Me.chkEnableMediaRenderer.Checked = Plugin.Settings.EnableMediaRenderer
         Me.chkPbkContinuousStream.Checked = Plugin.Settings.ContinuousOutput
@@ -86,6 +94,23 @@ Partial Friend NotInheritable Class SettingsDialog
         ' WYSIWYG prefixes prepended to filter/playlist names when pinned to the browse root.
         Me.txtLibOptFilterPrefix.Text = If(Plugin.Settings.FilterPrefix, "")
         Me.txtLibOptPlaylistPrefix.Text = If(Plugin.Settings.PlaylistPrefix, "")
+        ' Random source picker - "(All Music)" first, then every MusicBee filter. Same shape as
+        ' cboSrvIpAddress above: filled here, read back in the Save handler, no event handler.
+        ' Item 0 is the empty (whole-library) value, so SelectedIndex 0 <=> "".
+        Me.cboLibOptRandomSource.Items.Add(Plugin.L("cboLibOptRandomSourceAll"))
+        Me.cboLibOptRandomSource.SelectedIndex = 0
+        Dim savedRandomSource As String = If(Plugin.Settings.RandomSourceFilter, "")
+        For Each filterName As String In Plugin.ItemManager.RandomSourceFilterNames()
+            Dim addedAt As Integer = Me.cboLibOptRandomSource.Items.Add(filterName)
+            If String.Equals(filterName, savedRandomSource, StringComparison.OrdinalIgnoreCase) Then
+                Me.cboLibOptRandomSource.SelectedIndex = addedAt
+            End If
+        Next
+        ' A saved filter whose .xautopf has since been deleted or renamed is NOT re-added: it
+        ' selects nothing, so the picker shows "All Music" and saving clears the setting. That
+        ' is deliberate - you cannot draw a random pick from a filter that no longer exists, so
+        ' offering it would be a dead choice. It matches the runtime, where RandomSourceEndpoint
+        ' falls back to the whole library for exactly the same reason.
         LoadLibOptHierFields()
         ' EQ/DSP and ReplayGain are now per-profile - LoadProfile() wires them when a profile is selected.
         ' Filter/playlist hide is now part of the Views tab (Visibility checkbox).
@@ -1943,7 +1968,7 @@ Partial Friend NotInheritable Class SettingsDialog
     Private Sub UpdateCheckWorker()
         Try
             Dim latest As String = Nothing
-            If Not Plugin.UpdateCheck.TryGetLatestVersion("musicbee-upnp", latest) Then Return
+            If Not Plugin.UpdateCheck.TryGetLatestVersion(Plugin.UpdateCheck.AppId, latest) Then Return
             If Not Plugin.UpdateCheck.IsNewer(latest, Plugin.UpdateCheck.CurrentVersion()) Then Return
             If Me.IsHandleCreated Then
                 Me.BeginInvoke(New Action(Sub() ShowUpdateAvailable(latest)))
@@ -1971,19 +1996,19 @@ Partial Friend NotInheritable Class SettingsDialog
     Private Sub OpenUpdatePage(page As String)
         Try
             Dim culture As String = Plugin.Localisation.DetectMusicBeeLanguage()
-            System.Diagnostics.Process.Start(Plugin.UpdateCheck.PageUrl("musicbee-upnp", culture, page))
+            System.Diagnostics.Process.Start(Plugin.UpdateCheck.PageUrl(Plugin.UpdateCheck.AppId, culture, page))
         Catch
             ' silent
         End Try
     End Sub
 
     ' Opens the online help page for the plugin in the user's MusicBee language
-    ' (apps.yaiol.com/<lang>/p/musicbee-upnp/help/), mirroring the Electron / browser-ext
+    ' (apps.yaiol.com/<lang>/p/musicbee-upnp-plugin/help/), mirroring the Electron / browser-ext
     ' help button. The help site falls back to EN for any language not yet built.
     Private Sub btnHelp_Click(sender As Object, e As EventArgs)
         Try
             Dim culture As String = Plugin.Localisation.DetectMusicBeeLanguage()
-            System.Diagnostics.Process.Start(Plugin.UpdateCheck.HelpUrl("musicbee-upnp", culture))
+            System.Diagnostics.Process.Start(Plugin.UpdateCheck.HelpUrl(Plugin.UpdateCheck.AppId, culture))
         Catch
             ' silent
         End Try
@@ -1992,7 +2017,7 @@ Partial Friend NotInheritable Class SettingsDialog
     ' Opens the plugin's source repository on GitHub in the user's default browser.
     Private Sub btnGithub_Click(sender As Object, e As EventArgs)
         Try
-            System.Diagnostics.Process.Start("https://github.com/yaiol/musicbee-upnp")
+            System.Diagnostics.Process.Start(Plugin.UpdateCheck.RepoUrl)
         Catch
             ' silent
         End Try
@@ -2035,6 +2060,8 @@ Partial Friend NotInheritable Class SettingsDialog
             Plugin.Settings.ServerUpdatePlayStatistics = Me.chkLibOptSubmitPlayStats.Checked
             Plugin.Settings.FilterPrefix = Me.txtLibOptFilterPrefix.Text
             Plugin.Settings.PlaylistPrefix = Me.txtLibOptPlaylistPrefix.Text
+            ' Index 0 is "(All Music)" = no filter; anything else is the filter basename itself.
+            Plugin.Settings.RandomSourceFilter = If(Me.cboLibOptRandomSource.SelectedIndex <= 0, "", Me.cboLibOptRandomSource.SelectedItem.ToString())
             Plugin.Settings.HierarchicalFields = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
             If libOptHierMap IsNot Nothing Then
                 For Each kv As KeyValuePair(Of String, String) In libOptHierMap
@@ -2188,6 +2215,7 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.chkLibOptSubmitPlayStats.Text = Plugin.L("chkLibOptSubmitPlayStats")
         Me.lblLibOptFilterPrefix.Text = Plugin.L("lblLibOptFilterPrefix")
         Me.lblLibOptPlaylistPrefix.Text = Plugin.L("lblLibOptPlaylistPrefix")
+        Me.lblLibOptRandomSource.Text = Plugin.L("lblLibOptRandomSource")
         Me.lblLibOptHierFields.Text = Plugin.L("lblLibOptHierFields")
         Me.lblLibPthName.Text = Plugin.L("lblLibPthName")
         Me.lblLibPthNameCollision.Text = Plugin.L("lblLibPthNameCollision")

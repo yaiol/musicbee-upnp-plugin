@@ -18,6 +18,15 @@ Partial Public Class Plugin
         Private Const SITE As String = "https://apps.yaiol.com"
         Private Const ENDPOINT As String = "https://apps.yaiol.com/p"
 
+        ' The app id from info.json - the slug in every published URL (apps.yaiol.com/<lang>/p/<id>/,
+        ' the /p/<id>/latest.json beacon, github.com/yaiol/<id>). ⚠ CLAUDE: it is the FULL folder name
+        ' "musicbee-upnp-plugin", not the short "musicbee-upnp" - a shortened slug 404s everywhere.
+        ' Every caller passes this constant; never re-type the id at a call site.
+        Public Const AppId As String = "musicbee-upnp-plugin"
+
+        ' Source repository - same slug (github.com/yaiol/<AppId>).
+        Public Const RepoUrl As String = "https://github.com/yaiol/" & AppId
+
         ' Languages the website is actually published in - the plugin localizes into
         ' more, but release pages only exist for these; fall back to en otherwise.
         ' (Keep in sync with update-check.js SITE_LANGS.)

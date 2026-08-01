@@ -128,5 +128,7 @@
   "btnHelp": "도움말",
   "chkLibViwVisible": "표시",
   "chkLibViwTopLevel": "최상위",
-  "lblLibPthAlbumGroup": "앨범 그룹 기준:"
+  "lblLibPthAlbumGroup": "앨범 그룹 기준:",
+  "cboLibOptRandomSourceAll": "모든 음악",
+  "lblLibOptRandomSource": "임의 재생 출처:"
 }

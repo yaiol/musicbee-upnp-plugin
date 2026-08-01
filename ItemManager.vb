@@ -146,6 +146,12 @@ Partial Public Class Plugin
                 lazyAlbumsCache.Clear()
                 lazyResourceUrls.Clear()
                 lazyFilterConditionsCache.Clear()
+                ' Same reason: a cached search result set was matched against the old tags.
+                ' (Safe lock order - GetCachedSearchUrls never holds this lock while querying,
+                ' so it can't deadlock against the fileLookup lock held here.)
+                SyncLock lazySearchUrlCache
+                    lazySearchUrlCache.Clear()
+                End SyncLock
                 ' Drop in-memory endpoint loaded flags so audiobook/inbox/radio/podcast
                 ' get re-fetched on next browse to reflect tag/file mutations.
                 audiobookFilesLoaded = False
@@ -2112,7 +2118,28 @@ Partial Public Class Plugin
         ' minimal implementation; will move to Settings (configurable from the UI)
         ' once we've observed the real BubbleUPnP behaviour and tuned a sensible
         ' default.
-        Private Const LazySearchCap As Integer = 10
+        ' Result cache for one search, keyed by the generated SmartPlaylist query. A client
+        ' pages through a single search, so this turns N page requests into ONE MB query.
+        ' Deliberately tiny - it exists to serve the paging burst of the search in progress,
+        ' not to be a long-lived index. Cleared wholesale when it grows past a few searches,
+        ' which is also what keeps a library edit from being served stale for long.
+        Private Const LazySearchCacheMax As Integer = 8
+        Private Shared ReadOnly lazySearchUrlCache As New Dictionary(Of String, String())(StringComparer.Ordinal)
+
+        Private Shared Function GetCachedSearchUrls(query As String, logLabel As String) As String()
+            SyncLock lazySearchUrlCache
+                Dim hit() As String = Nothing
+                If lazySearchUrlCache.TryGetValue(query, hit) Then Return hit
+            End SyncLock
+            Dim urls() As String = Nothing
+            LazyQueryFilesEx(query, urls, logLabel)
+            If urls Is Nothing Then urls = New String() {}
+            SyncLock lazySearchUrlCache
+                If lazySearchUrlCache.Count >= LazySearchCacheMax Then lazySearchUrlCache.Clear()
+                lazySearchUrlCache(query) = urls
+            End SyncLock
+            Return urls
+        End Function
 
         ' New lazy-aware search path. Handles BubbleUPnP's standard global-search
         ' queries - currently just tracks-by-title and albums-by-title, both built
@@ -2126,9 +2153,10 @@ Partial Public Class Plugin
         ' Title-contains predicate. For any other container (including non-music
         ' lazy endpoints) we currently degrade to global-music search; per-
         ' endpoint scope support is a follow-up.
-        Private Function HandleLazySearch(headers As Dictionary(Of String, String), containerId As String, searchCriteria As String, filter As String, ByRef result As String, ByRef numberReturned As String, ByRef totalMatches As String) As Boolean
+        Private Function HandleLazySearch(headers As Dictionary(Of String, String), containerId As String, searchCriteria As String, filter As String, startingIndex As Integer, requestedCount As Integer, ByRef result As String, ByRef numberReturned As String, ByRef totalMatches As String) As Boolean
             Dim term As String = ExtractTitleContainsTerm(searchCriteria)
-            If String.IsNullOrEmpty(term) Then Return False
+            Dim artistTerm As String = ExtractArtistContainsTerm(searchCriteria)
+            If String.IsNullOrEmpty(term) AndAlso String.IsNullOrEmpty(artistTerm) Then Return False
             Dim wantsAlbums As Boolean = searchCriteria.IndexOf("musicAlbum", StringComparison.OrdinalIgnoreCase) >= 0
             Dim wantsTracks As Boolean = (Not wantsAlbums) AndAlso _
                 (searchCriteria.IndexOf("audioItem", StringComparison.OrdinalIgnoreCase) >= 0 OrElse _
@@ -2180,11 +2208,32 @@ Partial Public Class Plugin
             ' finds albums named X (not albums that happen to contain a track named X).
             ' For audioItem/musicTrack queries `dc:title` is the track title.
             Dim titleFieldName As String = If(wantsAlbums, "Album", "Title")
-            sb.Append("<Condition Field=""").Append(titleFieldName).Append(""" Comparison=""Contains"" Value=""").Append(XmlAttributeEscape(term)).Append(""" />")
+            If term.Length > 0 Then
+                sb.Append("<Condition Field=""").Append(titleFieldName).Append(""" Comparison=""Contains"" Value=""").Append(XmlAttributeEscape(term)).Append(""" />")
+            End If
+            ' Artist search. Matches Artist OR AlbumArtist: a compilation's tracks carry the
+            ' performer in Artist while the album is filed under AlbumArtist, so testing only
+            ' one silently loses half the matches. Same nested-Or shape as the multi-value
+            ' conditions built elsewhere, since MB has no cross-field OR at the top level.
+            If artistTerm.Length > 0 Then
+                Dim esc As String = XmlAttributeEscape(artistTerm)
+                sb.Append("<Condition Field=""Artist"" Comparison=""Contains"" Value=""").Append(esc).Append(""">")
+                sb.Append("<Or CombineMethod=""Any"">")
+                sb.Append("<Condition Field=""AlbumArtist"" Comparison=""Contains"" Value=""").Append(esc).Append(""" />")
+                sb.Append("</Or>")
+                sb.Append("</Condition>")
+            End If
             sb.Append("</Conditions></Source></SmartPlaylist>")
             Dim query As String = sb.ToString()
-            Dim urls() As String = Nothing
-            LazyQueryFilesEx(query, urls, "Search " & If(wantsAlbums, "albums-by-title", "tracks-by-title") & " term=" & term)
+            Dim searchedBy As String = If(artistTerm.Length > 0 AndAlso term.Length = 0, "by-artist", "by-title")
+            ' Cached per query: the client pages through one search, and re-running the MB
+            ' query for every page cost ~250ms each on a 2800-hit artist search - the whole
+            ' reason search felt slow. Same query text => same results, so the first page pays
+            ' and the rest are free.
+            Dim urls() As String = GetCachedSearchUrls(query, "Search " & If(wantsAlbums, "albums-", "tracks-") & searchedBy & " term=" & If(term.Length > 0, term, artistTerm))
+            ' UPnP: RequestedCount 0 means "all from startingIndex".
+            Dim pageSize As Integer = If(requestedCount <= 0, Integer.MaxValue, requestedCount)
+            If startingIndex < 0 Then startingIndex = 0
             Dim host As String
             Dim hostUrl As String = If(Not headers.TryGetValue("host", host), PrimaryHostUrl, "http://" & host)
             Dim text As New StringBuilder(8192)
@@ -2224,11 +2273,18 @@ Partial Public Class Plugin
                         End If
                     End SyncLock
                     totalCount = albumOrder.Count
-                    Dim emitCount As Integer = Math.Min(LazySearchCap, totalCount)
-                    SyncLock searchAlbumResultTracks
-                        searchAlbumResultTracks.Clear()
-                    End SyncLock
-                    For i As Integer = 0 To emitCount - 1
+                    ' Serve the REQUESTED page. This used to always emit the first N and report
+                    ' totalMatches = every match, so a client asking for items N.. got items 0..
+                    ' again and paged forever, re-running the query each time.
+                    Dim endIdx As Integer = Math.Min(startingIndex + pageSize - 1, totalCount - 1)
+                    ' A fresh search (page 0) resets the album tap-through cache; later pages add
+                    ' to it, so an id handed out on an earlier page keeps working.
+                    If startingIndex = 0 Then
+                        SyncLock searchAlbumResultTracks
+                            searchAlbumResultTracks.Clear()
+                        End SyncLock
+                    End If
+                    For i As Integer = startingIndex To endIdx
                         Dim key As String = albumOrder(i)
                         Dim tracks As List(Of String()) = albumGroups(key)
                         Dim title As String = tracks(0)(MetaDataIndex.Album)
@@ -2242,18 +2298,18 @@ Partial Public Class Plugin
                         emitted += 1
                     Next
                 Else
-                    Dim trackList As New List(Of String())
+                    ' Load ONLY the requested page's tags - the whole point of paging. Loading
+                    ' all 2800 hits per page was the second half of the slowness.
+                    totalCount = If(urls Is Nothing, 0, urls.Length)
+                    Dim endIdx As Integer = Math.Min(startingIndex + pageSize - 1, totalCount - 1)
+                    Dim slice As New List(Of String())
                     SyncLock fileLookup
-                        If urls IsNot Nothing Then
-                            For Each url As String In urls
-                                Dim tags() As String = LoadFile(url)
-                                If tags IsNot Nothing Then trackList.Add(tags)
-                            Next
-                        End If
+                        For i As Integer = startingIndex To endIdx
+                            Dim tags() As String = LoadFile(urls(i))
+                            If tags IsNot Nothing Then slice.Add(tags)
+                        Next
                     End SyncLock
-                    totalCount = trackList.Count
-                    Dim emitCount As Integer = Math.Min(LazySearchCap, totalCount)
-                    emitted = WriteAudioFilesDIDL(writer, hostUrl, filterSet, "object.item.audioItem.musicTrack", "0", trackList, 0, emitCount)
+                    emitted = WriteAudioFilesDIDL(writer, hostUrl, filterSet, "object.item.audioItem.musicTrack", "0", slice, 0, slice.Count)
                 End If
                 writer.WriteEndElement()
             End Using
@@ -2274,10 +2330,38 @@ Partial Public Class Plugin
         ' empty under the lazy design, which is exactly why the legacy fall-through returned
         ' zero. Returns False when the criteria isn't a class-only query we serve so the caller
         ' falls through to the legacy handler.
+        ' The endpoint a class-only ("random") Search draws from.
+        '
+        ' A control point's Random Tracks / Random Albums folder is CLIENT-side: it fires a bare
+        ' class query with no container, so there is nothing in the request that says "draw from
+        ' my jazz filter". Settings.RandomSourceFilter is how the user says it here instead -
+        ' empty = the whole music library, otherwise a filter basename applied as "filter:<name>",
+        ' which LazyBuildFilterQueryFor turns into that .xautopf's conditions.
+        '
+        ' scopedEndpoint = a container scope that genuinely NARROWS the search (a filter, or music
+        ' plus drill filters) - that wins, because the request already said which music. Pass
+        ' Nothing for "no real scope", which includes a bare "music" (see the caller: the root
+        ' container is substituted with L:music upstream, so bare music is NOT a client choice).
+        Friend Shared Function RandomSourceEndpoint(scopedEndpoint As String) As String
+            If Not String.IsNullOrEmpty(scopedEndpoint) Then Return scopedEndpoint
+            Dim configured As String = If(Settings.RandomSourceFilter, "").Trim()
+            If configured.Length = 0 Then Return "music"
+            ' A filter the user picked then deleted/renamed on disk would yield an empty condition
+            ' block, and LazyBuildFilterQueryFor would silently fall back to the whole library.
+            ' Falling back explicitly keeps that behaviour, but makes it visible in the log.
+            If GetFilterBaseConditions(configured).Length = 0 Then
+                LogInformation("RandomSource", "configured filter """ & configured & """ has no conditions (missing or empty .xautopf) - drawing from the whole library")
+                Return "music"
+            End If
+            Return "filter:" & configured
+        End Function
+
         Private Function HandleClassOnlySearch(headers As Dictionary(Of String, String), containerId As String, searchCriteria As String, filter As String, startingIndex As Integer, requestedCount As Integer, ByRef result As String, ByRef numberReturned As String, ByRef totalMatches As String) As Boolean
             If String.IsNullOrEmpty(searchCriteria) Then Return False
-            ' A title term is HandleLazySearch's job - only bare class queries land here.
-            If ExtractTitleContainsTerm(searchCriteria).Length > 0 Then Return False
+            ' Only a query that genuinely asks for EVERYTHING of a class lands here. Any field
+            ' predicate at all (title, artist, creator, genre, …) is HandleLazySearch's job -
+            ' see HasFieldPredicate for why this must be the general test and not just dc:title.
+            If HasFieldPredicate(searchCriteria) Then Return False
             Dim wantsAlbums As Boolean = IsAlbumClassQuery(searchCriteria)
             Dim wantsTracks As Boolean = (Not wantsAlbums) AndAlso searchCriteria.IndexOf("audioItem", StringComparison.OrdinalIgnoreCase) >= 0
             If Not wantsAlbums AndAlso Not wantsTracks Then Return False
@@ -2285,6 +2369,7 @@ Partial Public Class Plugin
             ' container (incl. in-memory endpoints) degrades to a global music search - same
             ' policy as HandleLazySearch, since podcast/inbox/etc. aren't SmartPlaylist-queryable.
             Dim scopeFilters As New List(Of LazyFilter)
+            Dim scopedEndpoint As String = Nothing
             If Not String.IsNullOrEmpty(containerId) AndAlso containerId.StartsWith("L:", StringComparison.OrdinalIgnoreCase) Then
                 Dim ep As String = Nothing
                 Dim pIdx As Integer
@@ -2292,12 +2377,28 @@ Partial Public Class Plugin
                 If TryParseLazyId(containerId, ep, pIdx, parsed) Then
                     Dim epLower As String = If(ep, "").ToLowerInvariant()
                     If epLower = "music" OrElse epLower.StartsWith("filter:", StringComparison.OrdinalIgnoreCase) Then
+                        ' Keep the endpoint, not just its level filters: for "L:filter:<name>" the
+                        ' filter's .xautopf conditions live in the ENDPOINT (the name merges into it,
+                        ' leaving parsed empty), so dropping it searched the whole library instead of
+                        ' the filter. Passing it to the query builders below applies those conditions.
+                        scopedEndpoint = ep
                         For Each f As LazyFilter In RealFiltersOnly(parsed)
                             scopeFilters.Add(f)
                         Next
                     End If
                 End If
             End If
+            ' Where this random pick draws from. A container scope wins ONLY when it actually
+            ' NARROWS the search (a filter, or music plus drill filters).
+            ' ⚠ CLAUDE: a bare "music" scope must NOT count as a deliberate choice. The root
+            ' container "0" is substituted with "L:music" upstream (ContentDirectoryService.
+            ' ResolveSearchContainer), and "0" is exactly what a client's Random folder sends -
+            ' so treating bare music as an explicit scope makes Settings.RandomSourceFilter dead
+            ' on arrival, which is the bug this shipped with on 2026-07-29. Bare music means
+            ' "the whole library", which is the case the setting exists to redirect.
+            Dim narrowedByClient As Boolean = scopedEndpoint IsNot Nothing AndAlso _
+                (scopeFilters.Count > 0 OrElse scopedEndpoint.StartsWith("filter:", StringComparison.OrdinalIgnoreCase))
+            Dim sourceEndpoint As String = RandomSourceEndpoint(If(narrowedByClient, scopedEndpoint, Nothing))
             Dim host As String
             Dim hostUrl As String = If(Not headers.TryGetValue("host", host), PrimaryHostUrl, "http://" & host)
             Dim filterSet As HashSet(Of String) = Nothing
@@ -2320,7 +2421,7 @@ Partial Public Class Plugin
                     If musicBinding IsNot Nothing AndAlso musicBinding.Paths IsNot Nothing AndAlso musicBinding.Paths.Length > 0 Then
                         groupBy = musicBinding.Paths(0).AlbumGroupBy
                     End If
-                    Dim albums As List(Of LazyAlbumEntry) = SortLazyAlbums(GetLazyAlbumsForFilterIn("music", scopeFilters, groupBy), groupBy)
+                    Dim albums As List(Of LazyAlbumEntry) = SortLazyAlbums(GetLazyAlbumsForFilterIn(sourceEndpoint, scopeFilters, groupBy), groupBy)
                     total = albums.Count
                     ' Fresh search (page 0) resets the tap-through cache; later pages accumulate.
                     If startingIndex = 0 Then
@@ -2337,7 +2438,7 @@ Partial Public Class Plugin
                         ' (searchAlbumResultTracks) serves the tracks when the user taps the album.
                         Dim albumFilters As New List(Of LazyFilter)(scopeFilters)
                         albumFilters.AddRange(a.Key)
-                        Dim tracks As List(Of String()) = GetLazyTracksForFilterIn("music", albumFilters)
+                        Dim tracks As List(Of String()) = GetLazyTracksForFilterIn(sourceEndpoint, albumFilters)
                         Dim albumId As String = "Ssrch_alb_" & i.ToString()
                         SyncLock searchAlbumResultTracks
                             searchAlbumResultTracks(albumId) = tracks
@@ -2347,7 +2448,7 @@ Partial Public Class Plugin
                     Next
                 Else
                     ' Track LIST: the scope's whole track set, sliced to the requested page.
-                    Dim query As String = LazyBuildFilterQueryFor("music", scopeFilters)
+                    Dim query As String = LazyBuildFilterQueryFor(sourceEndpoint, scopeFilters)
                     Dim urls() As String = Nothing
                     LazyQueryFilesEx(query, urls, "Search class-only tracks")
                     total = If(urls Is Nothing, 0, urls.Length)
@@ -2374,13 +2475,43 @@ Partial Public Class Plugin
         ' field name; preserves the term's original casing.
         Private Shared Function ExtractTitleContainsTerm(criteria As String) As String
             If String.IsNullOrEmpty(criteria) Then Return ""
-            Dim marker As String = "dc:title contains """
+            Return ExtractContainsTerm(criteria, "dc:title")
+        End Function
+
+        ' Extract the TERM in a `<field> contains "TERM"` subexpression, for any field.
+        ' Case-insensitive on the field name; preserves the term's original casing.
+        Private Shared Function ExtractContainsTerm(criteria As String, field As String) As String
+            If String.IsNullOrEmpty(criteria) Then Return ""
+            Dim marker As String = field & " contains """
             Dim idx As Integer = criteria.IndexOf(marker, StringComparison.OrdinalIgnoreCase)
             If idx < 0 Then Return ""
             idx += marker.Length
             Dim endIdx As Integer = criteria.IndexOf(""""c, idx)
             If endIdx < 0 Then Return ""
             Return criteria.Substring(idx, endIdx - idx)
+        End Function
+
+        ' Extract the artist term from a client's artist search. Clients send the two
+        ' spellings interchangeably and BubbleUPnP sends BOTH OR'd together with the same
+        ' term - `(dc:creator contains "X" or upnp:artist contains "X")` - so either hit
+        ' yields the same string and one Artist condition covers the pair.
+        Private Shared Function ExtractArtistContainsTerm(criteria As String) As String
+            Dim term As String = ExtractContainsTerm(criteria, "upnp:artist")
+            If term.Length > 0 Then Return term
+            Return ExtractContainsTerm(criteria, "dc:creator")
+        End Function
+
+        ' True when the criteria carries ANY field predicate (a `contains` on any field).
+        ' ⚠ CLAUDE: this is the guard that keeps HandleClassOnlySearch honest. That function
+        ' answers "give me all albums / all tracks" by returning the WHOLE library, so it must
+        ' only ever claim a query that really asks for everything. It used to decline solely on
+        ' a dc:title term, so an artist search (no title term) was claimed, its predicate thrown
+        ' away, and 329k tracks returned for a search that should match 579 - the client then
+        ' paged through all of them. Any new searchable field must be handled in
+        ' HandleLazySearch, never silently swallowed here.
+        Private Shared Function HasFieldPredicate(criteria As String) As Boolean
+            If String.IsNullOrEmpty(criteria) Then Return False
+            Return criteria.IndexOf(" contains """, StringComparison.OrdinalIgnoreCase) >= 0
         End Function
 
         Public Sub Search(headers As Dictionary(Of String, String), containerId As String, searchCriteria As String, filter As String, startingIndex As Integer, requestedCount As Integer, sortCriteria As String, ByRef result As String, ByRef numberReturned As String, ByRef totalMatches As String)
@@ -2394,7 +2525,7 @@ Partial Public Class Plugin
             ElseIf streamingProfile.WmcCompatability AndAlso (containerId = "5" OrElse containerId = "6" OrElse containerId = "7") Then
                 LoadNode(template, tree, True)
                 Browse(headers, If(containerId = "5", "1_103", If(containerId = "6", "1_101", "1_100")), BrowseFlag.BrowseDirectChildren, filter, startingIndex, requestedCount, sortCriteria, result, numberReturned, totalMatches)
-            ElseIf HandleLazySearch(headers, containerId, searchCriteria, filter, result, numberReturned, totalMatches) Then
+            ElseIf HandleLazySearch(headers, containerId, searchCriteria, filter, startingIndex, requestedCount, result, numberReturned, totalMatches) Then
                 ' Handled by the new lazy-aware search path (handles BubbleUPnP's
                 ' "(upnp:class ... and dc:title contains "TERM")" queries for both
                 ' track and album classes). Per-client scope substitution already
@@ -3544,7 +3675,11 @@ Partial Public Class Plugin
         ' directory listing only, no XML parsing or library query. Sorted by name.
         ' Id is the basename (no extension, no path) - that's what View.GetBinding
         ' uses ("filter:<basename>" matches DiscoverEndpoints' endpoint id).
-        Private Shared Function EnumerateLazyFilters() As List(Of LazyResourceEntry)
+        ' includeHidden: browsing honours each filter's Exposed flag (a hidden filter is not
+        ' advertised as a folder), but the Random-source picker must NOT - scoping random to a
+        ' filter is unrelated to whether you want that filter cluttering the browse tree, and
+        ' silently omitting it from the picker reads as "the filter is missing".
+        Private Shared Function EnumerateLazyFilters(Optional includeHidden As Boolean = False) As List(Of LazyResourceEntry)
             Dim list As New List(Of LazyResourceEntry)
             Try
                 Dim filtersDir As String = LazyFiltersDir()
@@ -3556,8 +3691,10 @@ Partial Public Class Plugin
                         ' Honor the per-filter visibility flag (binding.Exposed) - a hidden
                         ' filter is not advertised. (The eager LoadLibraryFilters gated here
                         ' too; this lazy enumerator is the path that actually runs.)
-                        Dim b As EndpointBinding = View.GetBinding("filter:" & displayName)
-                        If b IsNot Nothing AndAlso Not b.Exposed Then Continue For
+                        If Not includeHidden Then
+                            Dim b As EndpointBinding = View.GetBinding("filter:" & displayName)
+                            If b IsNot Nothing AndAlso Not b.Exposed Then Continue For
+                        End If
                         list.Add(New LazyResourceEntry With {.Name = displayName, .Id = displayName})
                     Next
                 End If
@@ -3565,6 +3702,17 @@ Partial Public Class Plugin
                 LogError(ex, "EnumerateLazyFilters")
             End Try
             Return list
+        End Function
+
+        ' Filter basenames offered as a Random source in the settings dialog. Returns plain
+        ' strings (the .xautopf basename, which is exactly what Settings.RandomSourceFilter
+        ' stores) so the dialog never touches the private LazyResourceEntry type.
+        Friend Shared Function RandomSourceFilterNames() As List(Of String)
+            Dim names As New List(Of String)
+            For Each e As LazyResourceEntry In EnumerateLazyFilters(includeHidden:=True)
+                If e IsNot Nothing AndAlso Not String.IsNullOrEmpty(e.Id) Then names.Add(e.Id)
+            Next
+            Return names
         End Function
 
         Private Shared Function LazyFiltersDir() As String

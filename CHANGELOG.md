@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.2 - 2026-08-01
+- Searching by artist now returns that artist's tracks instead of the entire library — an artist query previously had its predicate thrown away and was answered as "give me everything", so a search that should match a few hundred tracks returned the whole collection
+- Artist search matches both Artist and AlbumArtist, so a compilation's tracks are found whether the performer is on the track or the album
+- Search results are now paged properly — the server serves the page the client actually asked for instead of re-sending the first results forever, so scrolling through a long result list works
+- Search is much faster: the query runs once for the whole result list instead of once per page, and only the visible page's tags are loaded
+- New "Random plays from:" setting (Library ▸ General Options) — pick a MusicBee filter and a control point's Random Tracks / Random Albums draws from that filter instead of the whole library; hidden filters are offered too, and an explicit folder scope from the client still wins
+- Random Tracks / Random Albums launched from inside a filter folder now stays inside that filter instead of falling back to the whole library
+- Cached search results are dropped when the library is refreshed, so a search no longer serves stale hits after tags change
+- Help, GitHub and update-check buttons now open real pages — all three used a shortened app slug that 404'd silently
+- Section headers in the settings dialog follow MusicBee's UI font instead of showing a foreign design-time typeface
+
 ## 2.0.1 - 2026-07-26
 - Podcast episodes now advertise their real duration and file size in the UPnP metadata, so renderers (e.g. BubbleUPnP) no longer re-probe the whole stream on every play
 - Podcasts now appear under artist-based browse paths — the show name fills the Artist/AlbumArtist slots instead of leaving them empty, which previously dead-ended those groupings to an empty level

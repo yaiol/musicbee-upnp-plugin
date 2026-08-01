@@ -128,5 +128,7 @@
   "btnHelp": "Súgó",
   "chkLibViwVisible": "Látható",
   "chkLibViwTopLevel": "Fő szint",
-  "lblLibPthAlbumGroup": "Albumok csoportosítása:"
+  "lblLibPthAlbumGroup": "Albumok csoportosítása:",
+  "cboLibOptRandomSourceAll": "Összes zene",
+  "lblLibOptRandomSource": "Véletlenszerű lejátszás innen:"
 }

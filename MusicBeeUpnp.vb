@@ -803,6 +803,10 @@ Public Class Plugin
         ' browse root (per-endpoint EndpointBinding.AtTopLevel) - purely literal, no auto-space.
         Public FilterPrefix As String = "Filter: "
         Public PlaylistPrefix As String = "Playlist: "
+        ' Source a client's random request draws from. Empty = the whole music library
+        ' (default); otherwise the basename of a MusicBee filter (.xautopf), whose
+        ' conditions scope the pick. See Settings.RandomSourceFilter.
+        Public RandomSourceFilter As String = ""
         ' Hierarchical fields - newline-joined "field<TAB>char" rows. Each names a field whose
         ' tag values are split on the given 1-char delimiter into a browse sub-tree (e.g.
         ' Grouping + "/" → Jazz/Cool Jazz renders as Jazz › Cool Jazz). Empty = none.
@@ -901,6 +905,12 @@ Public Class Plugin
         ' WYSIWYG prefixes for filter/playlist names when pinned to the browse root (see DTO).
         Public Shared FilterPrefix As String = "Filter: "
         Public Shared PlaylistPrefix As String = "Playlist: "
+        ' Scope of the random pick a control point asks for. A client's "Random Tracks" /
+        ' "Random Albums" is a bare class-only Search with no container, so without this it
+        ' always drew from the whole library. Empty = whole music library (default);
+        ' otherwise a filter basename, applied as "filter:<name>" in ItemManager's
+        ' RandomSourceEndpoint. An EXPLICIT container scope from the client still wins.
+        Public Shared RandomSourceFilter As String = ""
         ' Field name → 1-char delimiter. Built from the DTO string on load; any field listed
         ' here renders as a slash-tree at every group-by level that uses it (see ItemManager).
         Public Shared HierarchicalFields As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
@@ -948,6 +958,7 @@ Public Class Plugin
             ClearLogOnStartup = data.ClearLogOnStartup
             FilterPrefix = If(data.FilterPrefix, "")
             PlaylistPrefix = If(data.PlaylistPrefix, "")
+            RandomSourceFilter = If(data.RandomSourceFilter, "")
             HierarchicalFields = ParseHierarchicalFields(data.HierarchicalFields)
             If data.StreamingProfiles IsNot Nothing Then
                 For Each p As StreamingProfile In data.StreamingProfiles
@@ -1075,6 +1086,7 @@ Public Class Plugin
                     .ClearLogOnStartup = ClearLogOnStartup,
                     .FilterPrefix = FilterPrefix,
                     .PlaylistPrefix = PlaylistPrefix,
+                    .RandomSourceFilter = RandomSourceFilter,
                     .HierarchicalFields = SerializeHierarchicalFields(HierarchicalFields),
                     .StreamingProfiles = StreamingProfiles.ToArray()
                 }

@@ -128,5 +128,7 @@
   "btnHelp": "Nápověda",
   "chkLibViwVisible": "Viditelné",
   "chkLibViwTopLevel": "Nejvyšší úroveň",
-  "lblLibPthAlbumGroup": "Seskupit alba podle:"
+  "lblLibPthAlbumGroup": "Seskupit alba podle:",
+  "cboLibOptRandomSourceAll": "Veškerá hudba",
+  "lblLibOptRandomSource": "Náhodné přehrávání z:"
 }

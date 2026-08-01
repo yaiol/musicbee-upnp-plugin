@@ -128,5 +128,7 @@
   "btnHelp": "مساعدة",
   "chkLibViwVisible": "مرئي",
   "chkLibViwTopLevel": "المستوى الأعلى",
-  "lblLibPthAlbumGroup": "تجميع الألبومات حسب:"
+  "lblLibPthAlbumGroup": "تجميع الألبومات حسب:",
+  "cboLibOptRandomSourceAll": "كل الموسيقى",
+  "lblLibOptRandomSource": "تشغيل عشوائي من:"
 }

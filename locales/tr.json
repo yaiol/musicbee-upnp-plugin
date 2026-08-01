@@ -128,5 +128,7 @@
   "btnHelp": "Yardım",
   "chkLibViwVisible": "Görünür",
   "chkLibViwTopLevel": "Üst düzey",
-  "lblLibPthAlbumGroup": "Albümü şuna göre grupla:"
+  "lblLibPthAlbumGroup": "Albümü şuna göre grupla:",
+  "cboLibOptRandomSourceAll": "Tüm Müzikler",
+  "lblLibOptRandomSource": "Rastgele çalma kaynağı:"
 }

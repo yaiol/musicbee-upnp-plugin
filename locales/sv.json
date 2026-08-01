@@ -128,5 +128,7 @@
   "btnHelp": "Hjälp",
   "chkLibViwVisible": "Synlig",
   "chkLibViwTopLevel": "Översta nivån",
-  "lblLibPthAlbumGroup": "Gruppera album efter:"
+  "lblLibPthAlbumGroup": "Gruppera album efter:",
+  "cboLibOptRandomSourceAll": "All musik",
+  "lblLibOptRandomSource": "Slumpmässig uppspelning från:"
 }

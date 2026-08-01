@@ -128,5 +128,7 @@
   "btnHelp": "Довідка",
   "chkLibViwVisible": "Видимий",
   "chkLibViwTopLevel": "Верхній рівень",
-  "lblLibPthAlbumGroup": "Групувати альбоми за:"
+  "lblLibPthAlbumGroup": "Групувати альбоми за:",
+  "cboLibOptRandomSourceAll": "Вся музика",
+  "lblLibOptRandomSource": "Випадкове відтворення з:"
 }

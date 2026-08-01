@@ -85,6 +85,8 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.txtLibOptHierChar = New System.Windows.Forms.TextBox()
         Me.btnLibOptHierAdd = New System.Windows.Forms.Button()
         Me.btnLibOptHierRemove = New System.Windows.Forms.Button()
+        Me.lblLibOptRandomSource = New System.Windows.Forms.Label()
+        Me.cboLibOptRandomSource = New System.Windows.Forms.ComboBox()
         Me.tabLibraryPaths = New System.Windows.Forms.TabPage()
         Me.btnLibViwApply = New System.Windows.Forms.Button()
         Me.chkLibViwVisible = New System.Windows.Forms.CheckBox()
@@ -210,7 +212,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblRendererName
         '
         Me.lblRendererName.AutoSize = True
-        Me.lblRendererName.Location = New System.Drawing.Point(20, 241)
+        Me.lblRendererName.Location = New System.Drawing.Point(20, 244)
         Me.lblRendererName.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblRendererName.Name = "lblRendererName"
         Me.lblRendererName.Size = New System.Drawing.Size(111, 17)
@@ -219,7 +221,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         'txtRendererName
         '
-        Me.txtRendererName.Location = New System.Drawing.Point(192, 236)
+        Me.txtRendererName.Location = New System.Drawing.Point(192, 241)
         Me.txtRendererName.Margin = New System.Windows.Forms.Padding(4)
         Me.txtRendererName.Name = "txtRendererName"
         Me.txtRendererName.Size = New System.Drawing.Size(353, 22)
@@ -268,7 +270,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblSrvName
         '
         Me.lblSrvName.AutoSize = True
-        Me.lblSrvName.Location = New System.Drawing.Point(20, 209)
+        Me.lblSrvName.Location = New System.Drawing.Point(20, 212)
         Me.lblSrvName.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblSrvName.Name = "lblSrvName"
         Me.lblSrvName.Size = New System.Drawing.Size(93, 17)
@@ -277,7 +279,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         'txtSrvName
         '
-        Me.txtSrvName.Location = New System.Drawing.Point(192, 206)
+        Me.txtSrvName.Location = New System.Drawing.Point(192, 209)
         Me.txtSrvName.Margin = New System.Windows.Forms.Padding(4)
         Me.txtSrvName.Name = "txtSrvName"
         Me.txtSrvName.Size = New System.Drawing.Size(353, 22)
@@ -286,7 +288,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblSrvIpAddress
         '
         Me.lblSrvIpAddress.AutoSize = True
-        Me.lblSrvIpAddress.Location = New System.Drawing.Point(20, 146)
+        Me.lblSrvIpAddress.Location = New System.Drawing.Point(20, 148)
         Me.lblSrvIpAddress.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblSrvIpAddress.Name = "lblSrvIpAddress"
         Me.lblSrvIpAddress.Size = New System.Drawing.Size(79, 17)
@@ -297,7 +299,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.cboSrvIpAddress.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.cboSrvIpAddress.FormattingEnabled = True
-        Me.cboSrvIpAddress.Location = New System.Drawing.Point(192, 141)
+        Me.cboSrvIpAddress.Location = New System.Drawing.Point(192, 146)
         Me.cboSrvIpAddress.Margin = New System.Windows.Forms.Padding(4)
         Me.cboSrvIpAddress.Name = "cboSrvIpAddress"
         Me.cboSrvIpAddress.Size = New System.Drawing.Size(241, 24)
@@ -306,7 +308,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblSrvPort
         '
         Me.lblSrvPort.AutoSize = True
-        Me.lblSrvPort.Location = New System.Drawing.Point(441, 146)
+        Me.lblSrvPort.Location = New System.Drawing.Point(441, 149)
         Me.lblSrvPort.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblSrvPort.Name = "lblSrvPort"
         Me.lblSrvPort.Size = New System.Drawing.Size(37, 17)
@@ -315,7 +317,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         'txtSrvPort
         '
-        Me.txtSrvPort.Location = New System.Drawing.Point(477, 143)
+        Me.txtSrvPort.Location = New System.Drawing.Point(477, 148)
         Me.txtSrvPort.Margin = New System.Windows.Forms.Padding(4)
         Me.txtSrvPort.MaxLength = 6
         Me.txtSrvPort.Name = "txtSrvPort"
@@ -325,7 +327,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblSrvMaxConnections
         '
         Me.lblSrvMaxConnections.AutoSize = True
-        Me.lblSrvMaxConnections.Location = New System.Drawing.Point(20, 176)
+        Me.lblSrvMaxConnections.Location = New System.Drawing.Point(20, 180)
         Me.lblSrvMaxConnections.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblSrvMaxConnections.Name = "lblSrvMaxConnections"
         Me.lblSrvMaxConnections.Size = New System.Drawing.Size(117, 17)
@@ -334,7 +336,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         'numSrvMaxConnections
         '
-        Me.numSrvMaxConnections.Location = New System.Drawing.Point(192, 173)
+        Me.numSrvMaxConnections.Location = New System.Drawing.Point(192, 178)
         Me.numSrvMaxConnections.Margin = New System.Windows.Forms.Padding(4)
         Me.numSrvMaxConnections.Maximum = New Decimal(New Integer() {256, 0, 0, 0})
         Me.numSrvMaxConnections.Minimum = New Decimal(New Integer() {1, 0, 0, 0})
@@ -886,6 +888,8 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.tabLibraryGeneral.Controls.Add(Me.txtLibOptHierChar)
         Me.tabLibraryGeneral.Controls.Add(Me.btnLibOptHierAdd)
         Me.tabLibraryGeneral.Controls.Add(Me.btnLibOptHierRemove)
+        Me.tabLibraryGeneral.Controls.Add(Me.lblLibOptRandomSource)
+        Me.tabLibraryGeneral.Controls.Add(Me.cboLibOptRandomSource)
         Me.tabLibraryGeneral.Location = New System.Drawing.Point(4, 25)
         Me.tabLibraryGeneral.Margin = New System.Windows.Forms.Padding(4)
         Me.tabLibraryGeneral.Name = "tabLibraryGeneral"
@@ -910,7 +914,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblLibOptFilterPrefix
         '
         Me.lblLibOptFilterPrefix.AutoSize = True
-        Me.lblLibOptFilterPrefix.Location = New System.Drawing.Point(41, 56)
+        Me.lblLibOptFilterPrefix.Location = New System.Drawing.Point(21, 56)
         Me.lblLibOptFilterPrefix.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblLibOptFilterPrefix.Name = "lblLibOptFilterPrefix"
         Me.lblLibOptFilterPrefix.Size = New System.Drawing.Size(173, 17)
@@ -928,7 +932,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblLibOptPlaylistPrefix
         '
         Me.lblLibOptPlaylistPrefix.AutoSize = True
-        Me.lblLibOptPlaylistPrefix.Location = New System.Drawing.Point(41, 88)
+        Me.lblLibOptPlaylistPrefix.Location = New System.Drawing.Point(21, 88)
         Me.lblLibOptPlaylistPrefix.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblLibOptPlaylistPrefix.Name = "lblLibOptPlaylistPrefix"
         Me.lblLibOptPlaylistPrefix.Size = New System.Drawing.Size(186, 17)
@@ -946,7 +950,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblLibOptHierFields
         '
         Me.lblLibOptHierFields.AutoSize = True
-        Me.lblLibOptHierFields.Location = New System.Drawing.Point(21, 128)
+        Me.lblLibOptHierFields.Location = New System.Drawing.Point(21, 151)
         Me.lblLibOptHierFields.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblLibOptHierFields.Name = "lblLibOptHierFields"
         Me.lblLibOptHierFields.Size = New System.Drawing.Size(124, 17)
@@ -957,7 +961,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.lstLibOptHierFields.FormattingEnabled = True
         Me.lstLibOptHierFields.ItemHeight = 16
-        Me.lstLibOptHierFields.Location = New System.Drawing.Point(21, 150)
+        Me.lstLibOptHierFields.Location = New System.Drawing.Point(21, 171)
         Me.lstLibOptHierFields.Name = "lstLibOptHierFields"
         Me.lstLibOptHierFields.Size = New System.Drawing.Size(300, 116)
         Me.lstLibOptHierFields.TabIndex = 11
@@ -967,14 +971,14 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.fpcLibOptHierField.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.fpcLibOptHierField.FieldCategory = MusicBeePlugin.Plugin.PathCategory.Standard
         Me.fpcLibOptHierField.FormattingEnabled = True
-        Me.fpcLibOptHierField.Location = New System.Drawing.Point(21, 276)
+        Me.fpcLibOptHierField.Location = New System.Drawing.Point(21, 293)
         Me.fpcLibOptHierField.Name = "fpcLibOptHierField"
         Me.fpcLibOptHierField.Size = New System.Drawing.Size(254, 24)
         Me.fpcLibOptHierField.TabIndex = 12
         '
         'txtLibOptHierChar
         '
-        Me.txtLibOptHierChar.Location = New System.Drawing.Point(281, 276)
+        Me.txtLibOptHierChar.Location = New System.Drawing.Point(281, 293)
         Me.txtLibOptHierChar.MaxLength = 1
         Me.txtLibOptHierChar.Name = "txtLibOptHierChar"
         Me.txtLibOptHierChar.Size = New System.Drawing.Size(40, 22)
@@ -982,7 +986,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         'btnLibOptHierAdd
         '
-        Me.btnLibOptHierAdd.Location = New System.Drawing.Point(327, 150)
+        Me.btnLibOptHierAdd.Location = New System.Drawing.Point(327, 171)
         Me.btnLibOptHierAdd.Name = "btnLibOptHierAdd"
         Me.btnLibOptHierAdd.Size = New System.Drawing.Size(28, 28)
         Me.btnLibOptHierAdd.TabIndex = 14
@@ -991,12 +995,32 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         'btnLibOptHierRemove
         '
-        Me.btnLibOptHierRemove.Location = New System.Drawing.Point(327, 180)
+        Me.btnLibOptHierRemove.Location = New System.Drawing.Point(327, 201)
         Me.btnLibOptHierRemove.Name = "btnLibOptHierRemove"
         Me.btnLibOptHierRemove.Size = New System.Drawing.Size(28, 28)
         Me.btnLibOptHierRemove.TabIndex = 15
         Me.btnLibOptHierRemove.Text = "−"
         Me.btnLibOptHierRemove.UseVisualStyleBackColor = True
+        '
+        'lblLibOptRandomSource
+        '
+        Me.lblLibOptRandomSource.AutoSize = True
+        Me.lblLibOptRandomSource.Location = New System.Drawing.Point(21, 120)
+        Me.lblLibOptRandomSource.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        Me.lblLibOptRandomSource.Name = "lblLibOptRandomSource"
+        Me.lblLibOptRandomSource.Size = New System.Drawing.Size(134, 17)
+        Me.lblLibOptRandomSource.TabIndex = 11
+        Me.lblLibOptRandomSource.Text = "Random plays from:"
+        '
+        'cboLibOptRandomSource
+        '
+        Me.cboLibOptRandomSource.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
+        Me.cboLibOptRandomSource.FormattingEnabled = True
+        Me.cboLibOptRandomSource.Location = New System.Drawing.Point(383, 120)
+        Me.cboLibOptRandomSource.Margin = New System.Windows.Forms.Padding(4)
+        Me.cboLibOptRandomSource.Name = "cboLibOptRandomSource"
+        Me.cboLibOptRandomSource.Size = New System.Drawing.Size(212, 24)
+        Me.cboLibOptRandomSource.TabIndex = 12
         '
         'tabLibraryPaths
         '
@@ -1827,6 +1851,8 @@ Partial Friend NotInheritable Class SettingsDialog
     Private WithEvents btnLibOptHierRemove As System.Windows.Forms.Button
     Private lblLibOptPlaylistPrefix As System.Windows.Forms.Label
     Private txtLibOptPlaylistPrefix As System.Windows.Forms.TextBox
+    Private lblLibOptRandomSource As System.Windows.Forms.Label
+    Private cboLibOptRandomSource As System.Windows.Forms.ComboBox
     Private lblLibPthTemplate As System.Windows.Forms.Label
     Private lstLibPthTemplate As System.Windows.Forms.ListBox
     Private btnLibPthTemplateNew As System.Windows.Forms.Button

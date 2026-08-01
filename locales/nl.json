@@ -128,5 +128,7 @@
   "btnHelp": "Help",
   "chkLibViwVisible": "Zichtbaar",
   "chkLibViwTopLevel": "Hoofdniveau",
-  "lblLibPthAlbumGroup": "Album groeperen op:"
+  "lblLibPthAlbumGroup": "Album groeperen op:",
+  "cboLibOptRandomSourceAll": "Alle muziek",
+  "lblLibOptRandomSource": "Willekeurig afspelen van:"
 }

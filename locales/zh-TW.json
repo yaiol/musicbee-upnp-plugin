@@ -128,5 +128,7 @@
   "btnHelp": "說明",
   "chkLibViwVisible": "可見",
   "chkLibViwTopLevel": "最上層",
-  "lblLibPthAlbumGroup": "專輯分組方式："
+  "lblLibPthAlbumGroup": "專輯分組方式：",
+  "cboLibOptRandomSourceAll": "所有音樂",
+  "lblLibOptRandomSource": "隨機播放來源："
 }

@@ -129,5 +129,7 @@
   "btnHelp": "Help",
   "chkLibViwVisible": "Visible",
   "chkLibViwTopLevel": "Top level",
-  "lblLibPthAlbumGroup": "Group album by:"
+  "lblLibPthAlbumGroup": "Group album by:",
+  "lblLibOptRandomSource": "Random plays from:",
+  "cboLibOptRandomSourceAll": "All Music"
 }
