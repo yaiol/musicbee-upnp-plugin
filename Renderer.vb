@@ -2,16 +2,24 @@ Imports System.Text
 Imports System.Xml
 Imports System.Net
 
-' F2.01 Phase 1 - MusicBee as a UPnP MediaRenderer (loopback only).
+' F2.01 - MusicBee as a UPnP MediaRenderer.
 '
 ' MusicBee advertises an EMBEDDED MediaRenderer device on the SAME UpnpServer/HttpServer/SSDP
 ' as the MediaServer (no second port). A control point (e.g. BubbleUPnP) can select MusicBee
 ' as a renderer and drive playback: Play/Pause/Stop/Seek/Next/Previous + volume.
 '
-' PHASE 1 SCOPE: loopback only. SetAVTransportURI resolves the incoming URI; if it points at our
-' OWN HTTP server (a /Files/ or /Encode/ track URL), we decode the track id and play the LOCAL
-' library file directly via the MusicBee API (bit-perfect, instant) instead of HTTP-fetching
-' ourselves. URIs that are NOT our own (e.g. a NAS) are out of scope for Phase 1 (Phase 2).
+' SetAVTransportURI takes one of two paths:
+'   - LOOPBACK (Phase 1): the URI points at our OWN HTTP server (a /Files/ or /Encode/ track URL),
+'     so we decode the track id and play the LOCAL library file directly via the MusicBee API -
+'     bit-perfect, instant, no HTTP round-trip to ourselves.
+'   - REMOTE (Phase 2): any other absolute http/https URI - a file served by the controller's own
+'     phone (Symfonium), a NAS, another MediaServer. We hand the URL straight to MusicBee's player
+'     (NowPlayingList_PlayNow), the same path it uses for internet radio, and let MusicBee stream it.
+'     Title/duration come from the controller-supplied DIDL CurrentURIMetaData, since MusicBee
+'     reports nothing useful for a URL that isn't in its library.
+' Anything else (file://, rtsp://, a relative string) is REFUSED with AVTransport error 716 rather
+' than accepted-then-silently-ignored - otherwise the controller thinks the track loaded, sends Play,
+' and MusicBee resumes some unrelated stale entry ("source file could not be found").
 '
 ' EVENTING: the UpnpService base sends a LastChange event once at subscribe time and does not
 ' retain subscribers for live push. Control points poll GetTransportInfo/GetPositionInfo, so
@@ -45,6 +53,59 @@ Partial Public Class Plugin
             LogError(ex, "ResolveLoopbackFile", "uri=" & uri)
         End Try
         Return Nothing
+    End Function
+
+    ' Phase 2 - a source we do NOT host. Accepts any absolute http/https URI and returns it
+    ' unchanged (never re-serialized: re-encoding an already-escaped path is how casting URLs get
+    ' corrupted). Everything else - file:// on a foreign machine, rtsp://, a relative string -
+    ' returns Nothing, which the caller turns into a proper UPnP error.
+    ' (Parameter deliberately not named "uri": VB is case-insensitive, so it would shadow the Uri type.)
+    Friend Shared Function ResolveRemoteUri(value As String) As String
+        If String.IsNullOrEmpty(value) Then Return Nothing
+        Dim trimmed As String = value.Trim()
+        Dim parsed As Uri = Nothing
+        If Not Uri.TryCreate(trimmed, UriKind.Absolute, parsed) Then Return Nothing
+        If parsed.Scheme <> Uri.UriSchemeHttp AndAlso parsed.Scheme <> Uri.UriSchemeHttps Then Return Nothing
+        Return trimmed
+    End Function
+
+    ' Pulls the display title + duration out of the controller-supplied DIDL-Lite metadata.
+    ' Needed only for the remote path: MusicBee knows nothing about a URL that isn't in its library,
+    ' so NowPlaying_GetDuration returns 0 and the controller's progress bar would sit at zero.
+    ' The SOAP layer hands us InnerXml (see UpnpService.ProceedControl), so the DIDL arrives
+    ' entity-escaped - decode before parsing. Best-effort: bad or absent metadata is not an error.
+    Friend Shared Sub ParseDidlMetadata(metadata As String, ByRef title As String, ByRef durationMs As Integer)
+        title = Nothing
+        durationMs = 0
+        If String.IsNullOrEmpty(metadata) Then Exit Sub
+        Try
+            Dim xml As String = WebUtility.HtmlDecode(metadata).Trim()
+            If Not xml.StartsWith("<") Then Exit Sub
+            Dim document As New XmlDocument()
+            document.LoadXml(xml)
+            Dim namespaceManager As New XmlNamespaceManager(document.NameTable)
+            namespaceManager.AddNamespace("didl", "urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/")
+            namespaceManager.AddNamespace("dc", "http://purl.org/dc/elements/1.1/")
+            Dim titleNode As XmlNode = document.SelectSingleNode("//dc:title", namespaceManager)
+            If titleNode IsNot Nothing Then title = titleNode.InnerText
+            Dim resNode As XmlNode = document.SelectSingleNode("//didl:res[@duration]", namespaceManager)
+            If resNode IsNot Nothing Then
+                ' res@duration is the same "H:MM:SS[.f]" shape AVTransport uses elsewhere.
+                Dim ms As Integer = ParseUpnpTime(resNode.Attributes("duration").Value)
+                If ms > 0 Then durationMs = ms
+            End If
+        Catch ex As Exception
+            LogError(ex, "ParseDidlMetadata")
+        End Try
+    End Sub
+
+    ' Duration to report to the controller. MusicBee's own value wins when it has one (local file);
+    ' for a remote URL it has none, so fall back to what the controller told us in the DIDL.
+    Friend Shared Function RendererDurationMs() As Integer
+        Dim durationMs As Integer = mbApiInterface.NowPlaying_GetDuration()
+        If durationMs <= 0 Then durationMs = rendererCurrentDurationMs
+        If durationMs < 0 Then durationMs = 0
+        Return durationMs
     End Function
 
     ' Milliseconds -> UPnP "H:MM:SS" time string.
@@ -149,24 +210,53 @@ Partial Public Class Plugin
                                       <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String,
                                       <UpnpServiceArgument("AVTransportURI")> CurrentURI As String,
                                       <UpnpServiceArgument("AVTransportURIMetaData")> CurrentURIMetaData As String)
-            ' Store the requested URI and resolve it to a local file (loopback). Phase 1: only our own URLs.
-            rendererCurrentUri = WebUtility.HtmlDecode(CurrentURI)
-            rendererCurrentLocalPath = ResolveLoopbackFile(rendererCurrentUri)
-            If rendererCurrentLocalPath Is Nothing Then
-                LogInformation("Renderer:SetAVTransportURI", "non-loopback or unresolved uri=" & rendererCurrentUri)
+            ' Resolve to a local library file first (loopback - bit-perfect); otherwise accept it as a
+            ' remote http/https source for MusicBee to stream. Refuse anything we can't play at all.
+            Dim uri As String = WebUtility.HtmlDecode(CurrentURI)
+            Dim localPath As String = ResolveLoopbackFile(uri)
+            Dim remoteUri As String = Nothing
+            If localPath Is Nothing Then
+                remoteUri = ResolveRemoteUri(uri)
+                If remoteUri Is Nothing Then
+                    LogInformation("Renderer:SetAVTransportURI", "refused unplayable uri=" & uri)
+                    Throw New SoapException(716, "Resource not found")
+                End If
             End If
+            Dim title As String = Nothing
+            Dim durationMs As Integer = 0
+            ParseDidlMetadata(CurrentURIMetaData, title, durationMs)
+            rendererCurrentUri = uri
+            rendererCurrentLocalPath = localPath
+            rendererCurrentRemoteUri = remoteUri
+            rendererCurrentMetaData = WebUtility.HtmlDecode(If(CurrentURIMetaData, ""))
+            rendererCurrentDurationMs = durationMs
+            ' A newly-set URI must win over a resume: without this, Play() on a paused player would
+            ' resume the PREVIOUS track and silently ignore the one the controller just loaded.
+            rendererPendingUri = True
+            LogInformation("Renderer:SetAVTransportURI", If(localPath IsNot Nothing, "loopback path=" & localPath, "remote uri=" & remoteUri) & ", title=" & If(title, "?") & ", duration=" & durationMs)
             request.Response.SendSoapHeadersBody(request)
         End Sub
 
         Private Sub Play(request As HttpRequest,
                          <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String,
                          <UpnpServiceArgument("TransportPlaySpeed")> Speed As String)
-            If mbApiInterface.Player_GetPlayState() = PlayState.Paused Then
+            Dim target As String = If(rendererCurrentLocalPath, rendererCurrentRemoteUri)
+            If rendererPendingUri AndAlso target IsNot Nothing Then
+                ' A URI was set since the last Play - start it, whatever the current transport state.
+                rendererPendingUri = False
+                ' Local path or remote URL, same call: MusicBee streams an http source the way it
+                ' streams internet radio. False = MusicBee refused it outright (unknown format, host
+                ' unreachable); say so instead of leaving the controller thinking playback started.
+                If Not mbApiInterface.NowPlayingList_PlayNow(target) Then
+                    LogInformation("Renderer:Play", "MusicBee refused target=" & target)
+                    Throw New SoapException(716, "Resource not found")
+                End If
+            ElseIf mbApiInterface.Player_GetPlayState() = PlayState.Paused Then
                 ' Resume.
                 mbApiInterface.Player_PlayPause()
-            ElseIf rendererCurrentLocalPath IsNot Nothing Then
-                ' Start the queued local track.
-                mbApiInterface.NowPlayingList_PlayNow(rendererCurrentLocalPath)
+            ElseIf target IsNot Nothing Then
+                ' Re-play the track already loaded (stopped, then Play again).
+                mbApiInterface.NowPlayingList_PlayNow(target)
             Else
                 mbApiInterface.Player_PlayPause()
             End If
@@ -225,8 +315,9 @@ Partial Public Class Plugin
         <UpnpServiceArgument(7, "AbsCount", "AbsoluteCounterPosition")>
         Private Sub GetPositionInfo(request As HttpRequest, <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String)
             Dim positionMs As Integer = mbApiInterface.Player_GetPosition()
-            Dim durationMs As Integer = mbApiInterface.NowPlaying_GetDuration()
-            request.Response.SendSoapHeadersBody(request, "1", FormatUpnpTime(durationMs), "", If(rendererCurrentUri, ""), FormatUpnpTime(positionMs), FormatUpnpTime(positionMs), "0", "0")
+            ' Echo the controller's own DIDL back as TrackMetaData - for a remote source it is the
+            ' only description of the track that exists on this side.
+            request.Response.SendSoapHeadersBody(request, "1", FormatUpnpTime(RendererDurationMs()), rendererCurrentMetaData, If(rendererCurrentUri, ""), FormatUpnpTime(positionMs), FormatUpnpTime(positionMs), "0", "0")
         End Sub
 
         <UpnpServiceArgument(0, "NrTracks", "NumberOfTracks")>
@@ -239,8 +330,7 @@ Partial Public Class Plugin
         <UpnpServiceArgument(7, "RecordMedium", "RecordStorageMedium")>
         <UpnpServiceArgument(8, "WriteStatus", "RecordMediumWriteStatus")>
         Private Sub GetMediaInfo(request As HttpRequest, <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String)
-            Dim durationMs As Integer = mbApiInterface.NowPlaying_GetDuration()
-            request.Response.SendSoapHeadersBody(request, "1", FormatUpnpTime(durationMs), If(rendererCurrentUri, ""), "", "", "", "NETWORK", "NOT_IMPLEMENTED", "NOT_IMPLEMENTED")
+            request.Response.SendSoapHeadersBody(request, "1", FormatUpnpTime(RendererDurationMs()), If(rendererCurrentUri, ""), rendererCurrentMetaData, "", "", "NETWORK", "NOT_IMPLEMENTED", "NOT_IMPLEMENTED")
         End Sub
 
         <UpnpServiceArgument(0, "PlayMode", "CurrentPlayMode")>
@@ -393,8 +483,16 @@ Partial Public Class Plugin
         End Sub
     End Class  ' RendererConnectionManagerService
 
-    ' Shared renderer state (single renderer instance / single InstanceID 0 in Phase 1).
+    ' Shared renderer state (single renderer instance / single InstanceID 0).
     Friend Shared rendererCurrentUri As String = ""
+    ' Exactly one of these two is set once a URI is accepted: local wins (loopback), remote otherwise.
     Friend Shared rendererCurrentLocalPath As String = Nothing
+    Friend Shared rendererCurrentRemoteUri As String = Nothing
+    ' Controller-supplied DIDL, decoded. Echoed back as TrackMetaData; duration parsed out of it
+    ' because MusicBee reports none for a URL outside its library.
+    Friend Shared rendererCurrentMetaData As String = ""
+    Friend Shared rendererCurrentDurationMs As Integer = 0
+    ' True between SetAVTransportURI and the Play that consumes it - makes a fresh URI beat a resume.
+    Friend Shared rendererPendingUri As Boolean = False
 
 End Class

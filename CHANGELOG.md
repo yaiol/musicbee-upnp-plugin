@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.3 - 2026-08-02
+- Casting a track that lives somewhere else — a file on your phone, a NAS, another media server — now plays in MusicBee; the renderer previously accepted only tracks from MusicBee's own library and silently dropped everything else, after which MusicBee resumed an unrelated leftover track and reported "the source file for the track could not be found"
+- Title and duration for such a track are taken from the metadata the controlling app sends, so the progress bar and track info are right even though MusicBee has never seen the file
+- A track the renderer genuinely cannot play is now refused outright, so the phone reports the failure itself instead of MusicBee raising an error about a different track entirely
+- Sending a new track to MusicBee while it sits paused now starts that track, instead of resuming the previous one and discarding the new one
+
 ## 2.0.2 - 2026-08-01
 - Searching by artist now returns that artist's tracks instead of the entire library — an artist query previously had its predicate thrown away and was answered as "give me everything", so a search that should match a few hundred tracks returned the whole collection
 - Artist search matches both Artist and AlbumArtist, so a compilation's tracks are found whether the performer is on the track or the album

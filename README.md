@@ -252,7 +252,7 @@ UPnP is the generic plumbing; DLNA is the interop layer on top of it. The plugin
 The plugin presents **two independent UPnP root devices**, both hosted on one shared HTTP server / port — plus a control point, which is a *client* and therefore not a device at all:
 
 - **MediaServer** (DMS) — Role A, the library server. Implements `ContentDirectory` (browse the library) + `ConnectionManager`. This is the mature side.
-- **MediaRenderer** (DMR) — Role C, MusicBee as the player. Implements `AVTransport` + `RenderingControl`. Phase 1: it advertises `DMR-1.50` but eventing is subscribe-time-only (no live push) — polling control points work, full GENA push is future work.
+- **MediaRenderer** (DMR) — Role C, MusicBee as the player. Implements `AVTransport` + `RenderingControl`. Plays both a **loopback** URI (one of our own `/Files/` or `/Encode/` URLs — short-circuited to the local library file, bit-perfect) and a **remote** `http(s)` URI cast from elsewhere (a phone, a NAS), which is handed to MusicBee's own streaming engine. It advertises `DMR-1.50` but eventing is subscribe-time-only (no live push) — polling control points work, full GENA push is future work.
 - **Control point** — Role B, MusicBee driving someone else's renderer. Discovers renderers by M-SEARCH and calls *their* services; it publishes nothing itself. Accepts `MediaRenderer:1`, `:2` and `:3` advertisements, which is what makes post-2020 devices work.
 
 Each role is independently gated by its own setting, so any combination runs. The renderer is a **separate root device with its own UUID and description document** (`/renderer.xml`), not a child of the server — combined-device control points would otherwise double-list it.
