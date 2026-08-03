@@ -74,6 +74,15 @@ Partial Public Class Plugin
                         Next value
                         writer.WriteEndElement()
                     End If
+                    ' Numeric range. Both bounds required (a half-declared range is worse than none);
+                    ' step is optional and omitted when absent.
+                    If Not String.IsNullOrEmpty(variable.Minimum) AndAlso Not String.IsNullOrEmpty(variable.Maximum) Then
+                        writer.WriteStartElement("allowedValueRange")
+                        writer.WriteElementString("minimum", variable.Minimum)
+                        writer.WriteElementString("maximum", variable.Maximum)
+                        If Not String.IsNullOrEmpty(variable.Step) Then writer.WriteElementString("step", variable.Step)
+                        writer.WriteEndElement()
+                    End If
                     writer.WriteEndElement()
                 Next variable
                 writer.WriteEndElement()

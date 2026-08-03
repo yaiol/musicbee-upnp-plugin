@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.5 - 2026-08-03
+- The volume on your phone and the volume in MusicBee now mean the same thing. The plugin never told controlling apps what its maximum volume was, so each one had to guess: Symfonium settled on 69, which made its 100% reach only 69% in MusicBee while MusicBee's own 100% read back as 144% on the phone. The renderer now declares the 0–100 range the standard asks for, so both ends agree and the phone's volume buttons can reach the top
+- Casting a whole album now keeps working past the first track. A controlling app announces the next track a fraction of a second after the current one, and that announcement was discarding the copy being fetched for the track about to play — so most tracks fell back to playing over the network, losing their title and the ability to jump through them. Copies for several tracks are now kept side by side, so an announcement can no longer cancel the one in use
+- Re-announcing a track that is already downloaded no longer fetches it a second time
+- Renderer logging now records the track description a controller sends, so questions about what a phone does and doesn't tell us can be answered from a real cast
+- Correct a log message that claimed a wait had timed out when it had in fact given up immediately
+
 ## 2.0.4 - 2026-08-02
 - Jumping to a different point in a track sent from your phone or another server now works; MusicBee refuses to reposition anything it fetches over the network, so the plugin quietly downloads a copy of the track while it plays and moves playback onto that copy, which behaves like any other file on your disk
 - A track sent by an app that doesn't give its files an ordinary extension now shows its real title and length from the first note, instead of appearing as a raw web address

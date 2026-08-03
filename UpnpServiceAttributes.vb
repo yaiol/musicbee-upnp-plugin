@@ -43,6 +43,20 @@ Partial Public Class Plugin
                 Return m_allowedValue
             End Get
         End Property
+
+        ' <allowedValueRange> — the NUMERIC counterpart of allowedValueList, and mandatory for any
+        ' variable whose scale a control point has to know (RenderingControl's Volume above all).
+        ' Set as named attribute arguments: <UpnpServiceVariable("Volume", "ui2", False,
+        ' Minimum:="0", Maximum:="100", [Step]:="1")>. Emitted only when Minimum and Maximum are
+        ' both present, so every other variable is unaffected.
+        '
+        ' ⚠ Leaving these off a Volume variable is NOT cosmetic: with no declared maximum the
+        ' controller has to invent one, and its guess silently rescales every volume in both
+        ' directions. Symfonium assumed 69, so its 100% set MusicBee to 69% and MusicBee's 100%
+        ' displayed as 144% on the phone (reported 2026-08-03).
+        Public Property Minimum() As String
+        Public Property Maximum() As String
+        Public Property [Step]() As String
     End Class  ' UpnpServiceVariable
 
     <AttributeUsage(AttributeTargets.Parameter Or AttributeTargets.Method, AllowMultiple:=True)> _

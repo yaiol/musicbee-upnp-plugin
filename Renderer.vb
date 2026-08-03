@@ -75,10 +75,11 @@ Partial Public Class Plugin
     ' so NowPlaying_GetDuration returns 0 and the controller's progress bar would sit at zero.
     ' The SOAP layer hands us InnerXml (see UpnpService.ProceedControl), so the DIDL arrives
     ' entity-escaped - decode before parsing. Best-effort: bad or absent metadata is not an error.
-    Friend Shared Sub ParseDidlMetadata(metadata As String, ByRef title As String, ByRef durationMs As Integer, ByRef protocolInfo As String)
+    Friend Shared Sub ParseDidlMetadata(metadata As String, ByRef title As String, ByRef durationMs As Integer, ByRef protocolInfo As String, ByRef lyricsUri As String)
         title = Nothing
         durationMs = 0
         protocolInfo = Nothing
+        lyricsUri = Nothing
         If String.IsNullOrEmpty(metadata) Then Exit Sub
         Try
             Dim xml As String = WebUtility.HtmlDecode(metadata).Trim()
@@ -88,6 +89,7 @@ Partial Public Class Plugin
             Dim namespaceManager As New XmlNamespaceManager(document.NameTable)
             namespaceManager.AddNamespace("didl", "urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/")
             namespaceManager.AddNamespace("dc", "http://purl.org/dc/elements/1.1/")
+            namespaceManager.AddNamespace("upnp", "urn:schemas-upnp-org:metadata-1-0/upnp/")
             Dim titleNode As XmlNode = document.SelectSingleNode("//dc:title", namespaceManager)
             If titleNode IsNot Nothing Then title = titleNode.InnerText
             Dim resNode As XmlNode = document.SelectSingleNode("//didl:res[@duration]", namespaceManager)
@@ -100,6 +102,12 @@ Partial Public Class Plugin
             ' pick a file extension for the local copy when the URL has none.
             Dim protocolNode As XmlNode = document.SelectSingleNode("//didl:res[@protocolInfo]", namespaceManager)
             If protocolNode IsNot Nothing Then protocolInfo = protocolNode.Attributes("protocolInfo").Value
+            ' upnp:lyricsURI - the ONE standard place a controller can point at an external .lrc.
+            ' Optional in the spec and widely omitted; if a sender does provide it we could fetch it
+            ' alongside the audio and drop it beside the temp copy as a sidecar. Read here so the
+            ' log can answer "does this sender send one?" from a real cast rather than a guess.
+            Dim lyricsNode As XmlNode = document.SelectSingleNode("//upnp:lyricsURI", namespaceManager)
+            If lyricsNode IsNot Nothing Then lyricsUri = lyricsNode.InnerText
         Catch ex As Exception
             LogError(ex, "ParseDidlMetadata")
         End Try
@@ -143,19 +151,46 @@ Partial Public Class Plugin
     ' Never hardcode the product name. UpdateCheck.ProductName() reads AssemblyProduct, which app-info
     ' writes from info.json - so a rename propagates here like it does everywhere else.
     Private Shared ReadOnly rendererCacheLock As New Object
-    ' The URI the cached file belongs to - guards against a Seek arriving after a NEW cast started.
-    Private Shared rendererCacheUri As String = Nothing
-    Private Shared rendererCacheFile As String = Nothing
-    Private Shared rendererCacheDownloading As Boolean = False
+    ' ⚠ SEVERAL entries, not one. A controller does not wait politely: Symfonium announces the NEXT
+    ' track ~150ms after the current one, both as SetAVTransportURI. With a single slot the second
+    ' announcement repurposed it, so the Play for the FIRST track found a slot belonging to another
+    ' URI, gave up instantly and streamed the remote URL - losing exactly the title and the seeking
+    ' this cache exists to provide. On an album that is nearly every track. Keyed by URI and holding
+    ' the last few, an announcement can no longer destroy the copy another command is about to need.
+    ' (Evicting is always safe: MusicBee reads a track into memory, so deleting a temp file it is
+    ' playing does not interrupt it.)
+    Private Const rendererCacheMaxEntries As Integer = 3
+    Private Shared ReadOnly rendererCacheEntries As New List(Of RendererCacheEntry)
     ' The local copy MusicBee is currently playing after a swap. Nothing while playing the remote
     ' URL, so a later Seek knows it still has to swap.
     Private Shared rendererPlayingCacheFile As String = Nothing
-    ' Size the sender advertised: 0 = headers not seen yet, -1 = none given (an endless stream),
-    ' >0 = the real length. Lets the first play tell "a second away" from "never going to finish".
-    Private Shared rendererCacheExpectedBytes As Long = 0
     ' Above this we don't hold up playback waiting for the copy - the wait would just run its timeout
     ' down and fall back to streaming anyway. Seeking still works once the download lands.
     Private Const rendererCacheWaitMaxBytes As Long = 64L * 1024L * 1024L
+
+    Friend NotInheritable Class RendererCacheEntry
+        Public ReadOnly Uri As String
+        Public ReadOnly Path As String
+        ' True from creation until the worker finishes, whether it succeeded or not.
+        Public Downloading As Boolean = True
+        Public Ready As Boolean = False
+        ' What the sender advertised: 0 = headers not seen yet, -1 = none given (an endless stream),
+        ' >0 = the real length. Lets the first play tell "a second away" from "never going to finish".
+        Public ExpectedBytes As Long = 0
+        Public Sub New(uri As String, path As String)
+            Me.Uri = uri
+            Me.Path = path
+        End Sub
+    End Class
+
+    ' ⚠ Call under rendererCacheLock.
+    Private Shared Function FindRendererCacheEntry(uri As String) As RendererCacheEntry
+        If uri Is Nothing Then Return Nothing
+        For Each entry As RendererCacheEntry In rendererCacheEntries
+            If String.Equals(entry.Uri, uri, StringComparison.Ordinal) Then Return entry
+        Next entry
+        Return Nothing
+    End Function
 
     ' %TEMP%\<product name>\ - spaces stripped so the path stays easy to type and to read in a log.
     Private Shared Function RendererCacheFolderPath() As String
@@ -261,20 +296,6 @@ Partial Public Class Plugin
         Return Nothing
     End Function
 
-    ' Forgets (and deletes) the previous cast's copy. An in-flight download is not killed - it checks
-    ' rendererCacheUri before publishing, so it discards its own file and self-cancels.
-    Private Shared Sub ResetRendererCache()
-        Dim stale As String
-        SyncLock rendererCacheLock
-            stale = rendererCacheFile
-            rendererCacheUri = Nothing
-            rendererCacheFile = Nothing
-        End SyncLock
-        rendererPlayingCacheFile = Nothing
-        rendererCacheExpectedBytes = 0
-        DeleteRendererCacheFile(stale)
-    End Sub
-
     Private Shared Sub StartRendererCacheDownload(uri As String, protocolInfo As String)
         Dim extension As String = RendererCacheExtension(uri, protocolInfo)
         If extension Is Nothing Then
@@ -288,11 +309,22 @@ Partial Public Class Plugin
             LogError(ex, "Renderer:StartRendererCacheDownload", "uri=" & uri)
             Exit Sub
         End Try
+        Dim evicted As New List(Of String)
         SyncLock rendererCacheLock
-            rendererCacheUri = uri
-            rendererCacheFile = Nothing
-            rendererCacheDownloading = True
+            ' Already held or already coming - a controller re-announcing the same track (Symfonium
+            ' does, on every queue nudge) must not start a second download of it.
+            If FindRendererCacheEntry(uri) IsNot Nothing Then Exit Sub
+            rendererCacheEntries.Add(New RendererCacheEntry(uri, target))
+            ' Oldest out first. The cap bounds the temp folder; three is comfortably more than the
+            ' "current + next" a controller keeps in flight.
+            Do While rendererCacheEntries.Count > rendererCacheMaxEntries
+                evicted.Add(rendererCacheEntries(0).Path)
+                rendererCacheEntries.RemoveAt(0)
+            Loop
         End SyncLock
+        For Each path As String In evicted
+            DeleteRendererCacheFile(path)
+        Next path
         ThreadPool.QueueUserWorkItem(AddressOf RendererCacheWorker, New String() {uri, target})
     End Sub
 
@@ -310,8 +342,9 @@ Partial Public Class Plugin
                 SyncLock rendererCacheLock
                     ' Publish the advertised size the moment we know it, so a first play that is
                     ' waiting can decide whether waiting is worth it at all.
-                    If String.Equals(rendererCacheUri, uri, StringComparison.Ordinal) Then
-                        rendererCacheExpectedBytes = If(response.ContentLength > 0, response.ContentLength, -1L)
+                    Dim opening As RendererCacheEntry = FindRendererCacheEntry(uri)
+                    If opening IsNot Nothing Then
+                        opening.ExpectedBytes = If(response.ContentLength > 0, response.ContentLength, -1L)
                     End If
                 End SyncLock
                 Using source As IO.Stream = response.GetResponseStream()
@@ -340,12 +373,15 @@ Partial Public Class Plugin
             LogError(ex, "Renderer:RendererCacheWorker", "uri=" & uri)
         End Try
         SyncLock rendererCacheLock
-            ' A new cast may have started while this ran - then the copy is already stale.
-            If Not String.Equals(rendererCacheUri, uri, StringComparison.Ordinal) Then
+            ' The entry may have been evicted while this ran - then the copy is already stale.
+            Dim entry As RendererCacheEntry = FindRendererCacheEntry(uri)
+            If entry Is Nothing OrElse Not String.Equals(entry.Path, target, StringComparison.OrdinalIgnoreCase) Then
                 complete = False
+            Else
+                entry.Downloading = False
+                entry.Ready = complete
+                If Not complete Then rendererCacheEntries.Remove(entry)
             End If
-            rendererCacheDownloading = False
-            rendererCacheFile = If(complete, target, Nothing)
         End SyncLock
         If complete Then
             LogInformation("Renderer:Cache", "ready " & target)
@@ -363,14 +399,15 @@ Partial Public Class Plugin
         Dim deadline As Long = DateTime.UtcNow.Ticks + (CLng(timeoutMs) * TimeSpan.TicksPerMillisecond)
         Do
             SyncLock rendererCacheLock
-                If Not String.Equals(rendererCacheUri, uri, StringComparison.Ordinal) Then Return Nothing
-                If rendererCacheFile IsNot Nothing Then Return rendererCacheFile
-                If Not rendererCacheDownloading Then Return Nothing
-                If beforeFirstPlay AndAlso rendererCacheExpectedBytes <> 0 Then
+                Dim entry As RendererCacheEntry = FindRendererCacheEntry(uri)
+                If entry Is Nothing Then Return Nothing
+                If entry.Ready Then Return entry.Path
+                If Not entry.Downloading Then Return Nothing
+                If beforeFirstPlay AndAlso entry.ExpectedBytes <> 0 Then
                     ' Headers are in. No length = an endless stream, which will never finish; too big
                     ' = the timeout would expire before it does. Start streaming instead, now.
-                    If rendererCacheExpectedBytes < 0 OrElse rendererCacheExpectedBytes > rendererCacheWaitMaxBytes Then
-                        LogInformation("Renderer:Cache", "not waiting for local copy, advertised size=" & rendererCacheExpectedBytes)
+                    If entry.ExpectedBytes < 0 OrElse entry.ExpectedBytes > rendererCacheWaitMaxBytes Then
+                        LogInformation("Renderer:Cache", "not waiting for local copy, advertised size=" & entry.ExpectedBytes)
                         Return Nothing
                     End If
                 End If
@@ -508,7 +545,8 @@ Partial Public Class Plugin
             Dim title As String = Nothing
             Dim durationMs As Integer = 0
             Dim protocolInfo As String = Nothing
-            ParseDidlMetadata(CurrentURIMetaData, title, durationMs, protocolInfo)
+            Dim lyricsUri As String = Nothing
+            ParseDidlMetadata(CurrentURIMetaData, title, durationMs, protocolInfo, lyricsUri)
             rendererCurrentUri = uri
             rendererCurrentLocalPath = localPath
             rendererCurrentRemoteUri = remoteUri
@@ -519,11 +557,16 @@ Partial Public Class Plugin
             rendererPendingUri = True
             ' Drop the previous cast's local copy, then start fetching this one in the background so
             ' a later Seek has a seekable file to swap onto. Playback itself does not wait for it.
-            ResetRendererCache()
             If remoteUri IsNot Nothing Then
                 StartRendererCacheDownload(remoteUri, protocolInfo)
             End If
             LogInformation("Renderer:SetAVTransportURI", If(localPath IsNot Nothing, "loopback path=" & localPath, "remote uri=" & remoteUri) & ", title=" & If(title, "?") & ", duration=" & durationMs)
+            ' DIAGNOSTIC (external lyrics): does this controller advertise a .lrc at all? Reports the
+            ' standard upnp:lyricsURI, then dumps the raw DIDL so a NON-standard element can be spotted
+            ' too - several servers invent their own rather than use the spec's. Capped: a DIDL is
+            ' normally under 2 KB, but nothing guarantees it and this must not flood the log.
+            LogInformation("Renderer:DIDL", "lyricsURI=" & If(lyricsUri, "(none)") & ", raw=" &
+                If(rendererCurrentMetaData.Length > 4000, rendererCurrentMetaData.Substring(0, 4000) & "…[truncated]", rendererCurrentMetaData))
             request.Response.SendSoapHeadersBody(request)
         End Sub
 
@@ -546,7 +589,10 @@ Partial Public Class Plugin
                 If rendererCurrentLocalPath Is Nothing AndAlso rendererCurrentRemoteUri IsNot Nothing Then
                     playingCache = WaitForRendererCache(rendererCurrentRemoteUri, rendererCacheFirstPlayWaitMs, True)
                     If playingCache Is Nothing Then
-                        LogInformation("Renderer:Play", "no local copy within " & rendererCacheFirstPlayWaitMs & "ms - streaming the remote url; title may show as the url and seeking needs a swap")
+                        ' Deliberately not "waited Nms": the wait also returns at once when there is
+                        ' no entry, or when the headers said it can't land in time. Claiming a
+                        ' duration that didn't happen sends the next investigation the wrong way.
+                        LogInformation("Renderer:Play", "no local copy available - streaming the remote url; title may show as the url and seeking needs a swap")
                     End If
                 End If
                 Dim startFrom As String = If(playingCache, target)
@@ -721,7 +767,10 @@ Partial Public Class Plugin
     ' ========================================================================
     ' RenderingControl service
     ' ========================================================================
-    <UpnpServiceVariable("Volume", "ui2", False)>
+    ' The range is MANDATORY, not decoration: it is how a controller learns what "maximum volume"
+    ' means here. Without it Symfonium guessed 69, so its 100% only reached 69% in MusicBee and
+    ' MusicBee's 100% read back as 144% on the phone - one wrong maximum, wrong in both directions.
+    <UpnpServiceVariable("Volume", "ui2", False, Minimum:="0", Maximum:="100", [Step]:="1")>
     <UpnpServiceVariable("Mute", "boolean", False)>
     <UpnpServiceVariable("PresetNameList", "string", False)>
     <UpnpServiceVariable("LastChange", "string", True)>
