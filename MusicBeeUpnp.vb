@@ -95,6 +95,9 @@ Public Class Plugin
         ' that's decided here at Initialise time.
         activeMaxConnections = If(Settings.MaxConnections > 0, Settings.MaxConnections, 16)
         activeServerPort = Settings.ServerPort
+        ' F2.01 - sweep any local copies of remote casts left behind by a MusicBee that was killed
+        ' mid-cast. They are pure scratch; the renderer re-fetches whatever it needs.
+        ClearRendererCacheFolder()
         boundServerPort = Settings.ServerPort
         activeEnableMediaRenderer = Settings.EnableMediaRenderer
         activeIpAddress = Settings.IpAddress

@@ -356,6 +356,22 @@ Partial Public Class Plugin
         Private ReadOnly avTransportStatusTimer As New Timer(AddressOf OnAvTransportStatusCheck, Nothing, Timeout.Infinite, Timeout.Infinite)
         Private Shared ReadOnly userAgent As String = "User-Agent: MusicBee UPnP Plugin" & ControlChars.CrLf
 
+        ' Parses the device description at deviceLocationUrl.
+        '
+        ' ⚠ A description can hold MORE THAN ONE device. A COMBINED device nests several inside the
+        ' root's <deviceList> — e.g. a Marantz ND8006 advertises a vendor root (AiosDevice) whose
+        ' list holds MediaRenderer, MediaServer and two Denon-private devices, so the document
+        ' contains several <serviceList>s and TWO ConnectionManagers. A flat scan of the whole
+        ' document therefore read the wrong device: last-one-wins handed connectionManagerUrl the
+        ' *MediaServer's* ConnectionManager, so Activate() asked a server what a renderer can play,
+        ' got no Sink element back, and silently fell through to the F34 "codec support assumed"
+        ' path — no format verification at all on exactly the fussy hardware that needs it. So
+        ' every field below is read from the renderer's OWN <device> subtree.
+        '
+        ' The one deliberate exception is UDN: a combined device announces one SSDP USN per embedded
+        ' device and ProcessMessage matches arriving notifications with Udn.Contains, so we keep
+        ' collecting every UDN in the document — narrowing that would make us miss our own device's
+        ' alive/byebye messages.
         Public Sub New(deviceLocationUrl As Uri)
             'Me.deviceLocationUrl = deviceLocationUrl
             Dim xml As String = GetXmlDocument(deviceLocationUrl)
@@ -365,65 +381,43 @@ Partial Public Class Plugin
                         xml = GetCleanedXml(xml)
                     End If
                     'LogInformation("NewMediaRendererDevice:" & deviceLocationUrl.ToString(), xml)
-                    Using reader As New XmlTextReader(xml, XmlNodeType.Document, Nothing)
-                        Do While reader.Read()
-                            If reader.NodeType = XmlNodeType.Element Then
-                                Dim name As String = reader.Name
-                                If String.Compare(name, "friendlyName", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                    If FriendlyName IsNot Nothing Then
-                                        reader.ReadString()
-                                    Else
-                                        FriendlyName = reader.ReadString()
-                                    End If
-                                ElseIf String.Compare(name, "modelDescription", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                    If modelDescription IsNot Nothing Then
-                                        reader.ReadString()
-                                    Else
-                                        modelDescription = reader.ReadString()
-                                    End If
-                                ElseIf String.Compare(name, "UDN", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                    Udn.Add(reader.ReadString())
-                                ElseIf String.Compare(name, "service", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                    Using serviceReader As XmlReader = reader.ReadSubtree()
-                                        Dim serviceType As String
-                                        Do While serviceReader.Read()
-                                            If serviceReader.NodeType = XmlNodeType.Element Then
-                                                name = serviceReader.Name
-                                                If String.Compare(name, "serviceType", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                                    serviceType = serviceReader.ReadString()
-                                                ElseIf serviceType IsNot Nothing Then
-                                                    If String.Compare(name, "SCPDURL", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                                        ':1
-                                                        If serviceType.StartsWith("urn:schemas-upnp-org:service:AVTransport:", StringComparison.OrdinalIgnoreCase) Then
-                                                            avTransportSCPDUri = New Uri(deviceLocationUrl, serviceReader.ReadString())
-                                                        ElseIf serviceType.StartsWith("urn:schemas-upnp-org:service:RenderingControl:", StringComparison.OrdinalIgnoreCase) Then
-                                                            renderingControlSCPDUri = New Uri(deviceLocationUrl, serviceReader.ReadString())
-                                                        End If
-                                                    ElseIf String.Compare(name, "controlURL", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                                        ':1
-                                                        If serviceType.StartsWith("urn:schemas-upnp-org:service:ConnectionManager:", StringComparison.OrdinalIgnoreCase) Then
-                                                            connectionManagerUrl = New Uri(deviceLocationUrl, serviceReader.ReadString())
-                                                        ElseIf serviceType.StartsWith("urn:schemas-upnp-org:service:AVTransport:", StringComparison.OrdinalIgnoreCase) Then
-                                                            avTransportControlUrl = New Uri(deviceLocationUrl, serviceReader.ReadString())
-                                                        ElseIf serviceType.StartsWith("urn:schemas-upnp-org:service:RenderingControl:", StringComparison.OrdinalIgnoreCase) Then
-                                                            renderingControlUrl = New Uri(deviceLocationUrl, serviceReader.ReadString())
-                                                        End If
-                                                    ElseIf String.Compare(name, "eventSubURL", StringComparison.OrdinalIgnoreCase) = 0 Then
-                                                        ':1
-                                                        If serviceType.StartsWith("urn:schemas-upnp-org:service:AVTransport:", StringComparison.OrdinalIgnoreCase) Then
-                                                            avTransportEventUrl = New Uri(deviceLocationUrl, serviceReader.ReadString())
-                                                        ElseIf serviceType.StartsWith("urn:schemas-upnp-org:service:RenderingControl:", StringComparison.OrdinalIgnoreCase) Then
-                                                            renderingControlEventUrl = New Uri(deviceLocationUrl, serviceReader.ReadString())
-                                                        End If
-                                                    End If
-                                                End If
-                                            End If
-                                        Loop
-                                    End Using
-                                End If
+                    Dim document As New XmlDocument()
+                    document.LoadXml(xml)
+                    CollectUdns(document.DocumentElement)
+                    ' Fall back to the whole document when no device declares itself a MediaRenderer
+                    ' (a non-conformant description) — same reach as before, rather than nothing.
+                    Dim renderer As XmlNode = FindRendererDevice(document.DocumentElement)
+                    If renderer Is Nothing Then
+                        renderer = document.DocumentElement
+                    End If
+                    FriendlyName = ChildText(renderer, "friendlyName")
+                    modelDescription = If(ChildText(renderer, "modelDescription"), "")
+                    Dim serviceList As XmlNode = ChildElement(renderer, "serviceList")
+                    If serviceList IsNot Nothing Then
+                        For Each service As XmlNode In serviceList.ChildNodes
+                            If service.NodeType <> XmlNodeType.Element OrElse String.Compare(service.LocalName, "service", StringComparison.OrdinalIgnoreCase) <> 0 Then
+                                Continue For
                             End If
-                        Loop
-                    End Using
+                            Dim serviceType As String = ChildText(service, "serviceType")
+                            If serviceType Is Nothing Then Continue For
+                            serviceType = serviceType.Trim()
+                            Dim scpdUrl As String = ChildText(service, "SCPDURL")
+                            Dim controlUrl As String = ChildText(service, "controlURL")
+                            Dim eventUrl As String = ChildText(service, "eventSubURL")
+                            ' StartsWith, not equality — the version suffix varies (:1, :2, :3).
+                            If serviceType.StartsWith("urn:schemas-upnp-org:service:AVTransport:", StringComparison.OrdinalIgnoreCase) Then
+                                If Not String.IsNullOrEmpty(scpdUrl) Then avTransportSCPDUri = New Uri(deviceLocationUrl, scpdUrl)
+                                If Not String.IsNullOrEmpty(controlUrl) Then avTransportControlUrl = New Uri(deviceLocationUrl, controlUrl)
+                                If Not String.IsNullOrEmpty(eventUrl) Then avTransportEventUrl = New Uri(deviceLocationUrl, eventUrl)
+                            ElseIf serviceType.StartsWith("urn:schemas-upnp-org:service:RenderingControl:", StringComparison.OrdinalIgnoreCase) Then
+                                If Not String.IsNullOrEmpty(scpdUrl) Then renderingControlSCPDUri = New Uri(deviceLocationUrl, scpdUrl)
+                                If Not String.IsNullOrEmpty(controlUrl) Then renderingControlUrl = New Uri(deviceLocationUrl, controlUrl)
+                                If Not String.IsNullOrEmpty(eventUrl) Then renderingControlEventUrl = New Uri(deviceLocationUrl, eventUrl)
+                            ElseIf serviceType.StartsWith("urn:schemas-upnp-org:service:ConnectionManager:", StringComparison.OrdinalIgnoreCase) Then
+                                If Not String.IsNullOrEmpty(controlUrl) Then connectionManagerUrl = New Uri(deviceLocationUrl, controlUrl)
+                            End If
+                        Next service
+                    End If
                     Exit For
                 Catch ex As XmlException
                     If retry = 2 Then
@@ -431,6 +425,57 @@ Partial Public Class Plugin
                     End If
                 End Try
             Next retry
+        End Sub
+
+        ' Direct-child element with this local name. Namespace-agnostic on purpose: descriptions in
+        ' the wild come with the schemas-upnp-org namespace, with none at all, or behind a prefix.
+        Private Shared Function ChildElement(parent As XmlNode, localName As String) As XmlNode
+            If parent Is Nothing Then Return Nothing
+            For Each child As XmlNode In parent.ChildNodes
+                If child.NodeType = XmlNodeType.Element AndAlso String.Compare(child.LocalName, localName, StringComparison.OrdinalIgnoreCase) = 0 Then
+                    Return child
+                End If
+            Next child
+            Return Nothing
+        End Function
+
+        Private Shared Function ChildText(parent As XmlNode, localName As String) As String
+            Dim element As XmlNode = ChildElement(parent, localName)
+            If element Is Nothing Then Return Nothing
+            Return element.InnerText
+        End Function
+
+        ' The <device> node that IS the MediaRenderer, depth-first from the document root — so a
+        ' plain renderer (the root device itself) and an embedded one (inside a combined device's
+        ' <deviceList>) both resolve through the same walk.
+        Private Shared Function FindRendererDevice(node As XmlNode) As XmlNode
+            If node Is Nothing Then Return Nothing
+            If node.NodeType = XmlNodeType.Element AndAlso String.Compare(node.LocalName, "device", StringComparison.OrdinalIgnoreCase) = 0 Then
+                Dim deviceType As String = ChildText(node, "deviceType")
+                If deviceType IsNot Nothing AndAlso deviceType.Trim().StartsWith("urn:schemas-upnp-org:device:MediaRenderer:", StringComparison.OrdinalIgnoreCase) Then
+                    Return node
+                End If
+            End If
+            For Each child As XmlNode In node.ChildNodes
+                If child.NodeType = XmlNodeType.Element Then
+                    Dim found As XmlNode = FindRendererDevice(child)
+                    If found IsNot Nothing Then Return found
+                End If
+            Next child
+            Return Nothing
+        End Function
+
+        ' Every UDN in the document, whichever embedded device owns it — see the constructor's note.
+        Private Sub CollectUdns(node As XmlNode)
+            If node Is Nothing Then Exit Sub
+            If node.NodeType = XmlNodeType.Element AndAlso String.Compare(node.LocalName, "UDN", StringComparison.OrdinalIgnoreCase) = 0 Then
+                Dim value As String = node.InnerText
+                If Not String.IsNullOrEmpty(value) Then Udn.Add(value)
+                Exit Sub
+            End If
+            For Each child As XmlNode In node.ChildNodes
+                If child.NodeType = XmlNodeType.Element Then CollectUdns(child)
+            Next child
         End Sub
 
         Public Sub Dispose()

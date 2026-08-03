@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.4 - 2026-08-02
+- Jumping to a different point in a track sent from your phone or another server now works; MusicBee refuses to reposition anything it fetches over the network, so the plugin quietly downloads a copy of the track while it plays and moves playback onto that copy, which behaves like any other file on your disk
+- A track sent by an app that doesn't give its files an ordinary extension now shows its real title and length from the first note, instead of appearing as a raw web address
+- A jump the renderer genuinely cannot carry out is now refused with a proper error, so the controlling app says so instead of the position slider silently sliding back
+- Play-to devices that present themselves as one combined unit — a Marantz or Denon streamer, where the player sits inside a manufacturer wrapper alongside a media server — are now read correctly; the plugin was picking up the media server's connection details by mistake and so never checked which formats the streamer could actually play
+- A device's model description is now taken into account when matching it to a device profile; it was read from the wrong place and silently thrown away
+- Renderer logging now covers seeking, playback start and position polling, so unexpected behaviour with a remote source can be diagnosed from the log
+- Downloaded copies live in a temporary folder named after the plugin and are cleared away at startup
+
 ## 2.0.3 - 2026-08-02
 - Casting a track that lives somewhere else — a file on your phone, a NAS, another media server — now plays in MusicBee; the renderer previously accepted only tracks from MusicBee's own library and silently dropped everything else, after which MusicBee resumed an unrelated leftover track and reported "the source file for the track could not be found"
 - Title and duration for such a track are taken from the metadata the controlling app sends, so the progress bar and track info are right even though MusicBee has never seen the file

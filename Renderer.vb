@@ -1,6 +1,7 @@
 Imports System.Text
 Imports System.Xml
 Imports System.Net
+Imports System.Threading
 
 ' F2.01 - MusicBee as a UPnP MediaRenderer.
 '
@@ -74,9 +75,10 @@ Partial Public Class Plugin
     ' so NowPlaying_GetDuration returns 0 and the controller's progress bar would sit at zero.
     ' The SOAP layer hands us InnerXml (see UpnpService.ProceedControl), so the DIDL arrives
     ' entity-escaped - decode before parsing. Best-effort: bad or absent metadata is not an error.
-    Friend Shared Sub ParseDidlMetadata(metadata As String, ByRef title As String, ByRef durationMs As Integer)
+    Friend Shared Sub ParseDidlMetadata(metadata As String, ByRef title As String, ByRef durationMs As Integer, ByRef protocolInfo As String)
         title = Nothing
         durationMs = 0
+        protocolInfo = Nothing
         If String.IsNullOrEmpty(metadata) Then Exit Sub
         Try
             Dim xml As String = WebUtility.HtmlDecode(metadata).Trim()
@@ -94,6 +96,10 @@ Partial Public Class Plugin
                 Dim ms As Integer = ParseUpnpTime(resNode.Attributes("duration").Value)
                 If ms > 0 Then durationMs = ms
             End If
+            ' protocolInfo ("http-get:*:audio/mpeg:*") names the MIME type - the only reliable way to
+            ' pick a file extension for the local copy when the URL has none.
+            Dim protocolNode As XmlNode = document.SelectSingleNode("//didl:res[@protocolInfo]", namespaceManager)
+            If protocolNode IsNot Nothing Then protocolInfo = protocolNode.Attributes("protocolInfo").Value
         Catch ex As Exception
             LogError(ex, "ParseDidlMetadata")
         End Try
@@ -107,6 +113,283 @@ Partial Public Class Plugin
         If durationMs < 0 Then durationMs = 0
         Return durationMs
     End Function
+
+    ' ========================================================================
+    ' Remote-source cache - "fetch to temp, swap on seek"
+    ' ========================================================================
+    ' MusicBee treats ANY http:// source as a stream and will not reposition it: Player_SetPosition
+    ' returns True, Player_GetPosition reads back the target, and then the decoder - which never
+    ' moved - overwrites it a fraction of a second later, so the controller's slider snaps back.
+    ' This is NOT the sender's fault: BubbleUPnP's media server answers Range requests correctly
+    ' (206 + Content-Range + Accept-Ranges), which is why proxying the stream would change nothing.
+    '
+    ' So a remote cast is fetched twice over. MusicBee streams the URL directly - instant start,
+    ' that is what the listener hears - while we download the same file to %TEMP% in the background.
+    ' The moment a Seek arrives we swap playback onto the downloaded copy, which is an ordinary local
+    ' file and seeks normally; every later seek on that track is then instant.
+    '
+    ' The good property of doing both: an endless stream (internet radio) simply never finishes
+    ' downloading, so seeking stays unavailable and nothing hangs waiting to buffer. The size cap
+    ' below is what stops such a stream filling the disk - it is a safety valve, not a tuning knob.
+    Private Const rendererCacheMaxBytes As Long = 300L * 1024L * 1024L
+    ' How long a Seek waits for an in-flight download before giving up and reporting 710. Covers the
+    ' case of seeking within a second or two of starting a track.
+    Private Const rendererCacheGraceMs As Integer = 2000
+    ' How long the FIRST play waits for the local copy. Long enough for a normal track over a LAN
+    ' (measured around half a second), short enough that a slow sender falls back to streaming rather
+    ' than leaving the user staring at silence. Exceeding it costs the title and instant seeking,
+    ' never the playback itself.
+    Private Const rendererCacheFirstPlayWaitMs As Integer = 3000
+    ' Never hardcode the product name. UpdateCheck.ProductName() reads AssemblyProduct, which app-info
+    ' writes from info.json - so a rename propagates here like it does everywhere else.
+    Private Shared ReadOnly rendererCacheLock As New Object
+    ' The URI the cached file belongs to - guards against a Seek arriving after a NEW cast started.
+    Private Shared rendererCacheUri As String = Nothing
+    Private Shared rendererCacheFile As String = Nothing
+    Private Shared rendererCacheDownloading As Boolean = False
+    ' The local copy MusicBee is currently playing after a swap. Nothing while playing the remote
+    ' URL, so a later Seek knows it still has to swap.
+    Private Shared rendererPlayingCacheFile As String = Nothing
+    ' Size the sender advertised: 0 = headers not seen yet, -1 = none given (an endless stream),
+    ' >0 = the real length. Lets the first play tell "a second away" from "never going to finish".
+    Private Shared rendererCacheExpectedBytes As Long = 0
+    ' Above this we don't hold up playback waiting for the copy - the wait would just run its timeout
+    ' down and fall back to streaming anyway. Seeking still works once the download lands.
+    Private Const rendererCacheWaitMaxBytes As Long = 64L * 1024L * 1024L
+
+    ' %TEMP%\<product name>\ - spaces stripped so the path stays easy to type and to read in a log.
+    Private Shared Function RendererCacheFolderPath() As String
+        Dim name As New StringBuilder
+        For Each character As Char In UpdateCheck.ProductName()
+            If Not Char.IsWhiteSpace(character) AndAlso Array.IndexOf(IO.Path.GetInvalidFileNameChars(), character) < 0 Then
+                name.Append(character)
+            End If
+        Next character
+        Return IO.Path.Combine(IO.Path.GetTempPath(), name.ToString())
+    End Function
+
+    Private Shared Function RendererCacheFolder() As String
+        Dim folder As String = RendererCacheFolderPath()
+        If Not IO.Directory.Exists(folder) Then IO.Directory.CreateDirectory(folder)
+        Return folder
+    End Function
+
+    ' Called once at startup: MusicBee may have been killed mid-cast, leaving copies behind.
+    Friend Shared Sub ClearRendererCacheFolder()
+        Try
+            Dim folder As String = RendererCacheFolderPath()
+            If Not IO.Directory.Exists(folder) Then Exit Sub
+            For Each file As String In IO.Directory.GetFiles(folder)
+                Try
+                    IO.File.Delete(file)
+                Catch
+                    ' Still locked by something - it will be swept on a later start.
+                End Try
+            Next file
+        Catch ex As Exception
+            LogError(ex, "Renderer:ClearRendererCacheFolder")
+        End Try
+    End Sub
+
+    Private Shared Sub DeleteRendererCacheFile(path As String)
+        If String.IsNullOrEmpty(path) Then Exit Sub
+        Try
+            If IO.File.Exists(path) Then IO.File.Delete(path)
+        Catch ex As Exception
+            ' MusicBee may still hold it open (we swapped playback onto it). Not worth retrying -
+            ' ClearRendererCacheFolder sweeps it on the next start.
+            LogInformation("Renderer:Cache", "could not delete " & path & " - " & ex.Message)
+        End Try
+    End Sub
+
+    ' The extension the local copy must carry. MusicBee picks its decoder from the extension, so a
+    ' wrong guess is worse than none - when neither the URL nor the DIDL names a known audio type we
+    ' return Nothing and simply don't cache (seeking stays unavailable, playback is unaffected).
+    Private Shared Function RendererCacheExtension(uri As String, protocolInfo As String) As String
+        Dim fromUrl As String = UrlAudioExtension(uri)
+        If fromUrl IsNot Nothing Then Return fromUrl
+        Return MimeAudioExtension(protocolInfo)
+    End Function
+
+    ' The URL's own extension, when it names an audio type we recognise. Also decides whether the
+    ' first play has to wait for the local copy: a URL MusicBee can't type is one whose tags it will
+    ' never read, so the track would otherwise show as a bare URL with no title.
+    Private Shared Function UrlAudioExtension(uri As String) As String
+        Dim known() As String = {".mp3", ".flac", ".m4a", ".mp4", ".aac", ".ogg", ".oga", ".opus", ".wav", ".wma", ".wv", ".mpc", ".ape", ".aiff", ".aif", ".dsf", ".dff"}
+        Try
+            Dim parsed As New Uri(uri)
+            Dim extension As String = IO.Path.GetExtension(parsed.AbsolutePath)
+            If Not String.IsNullOrEmpty(extension) Then
+                extension = extension.ToLowerInvariant()
+                If Array.IndexOf(known, extension) >= 0 Then Return extension
+            End If
+        Catch
+            ' Not a parsable URL - treated as "no usable extension".
+        End Try
+        Return Nothing
+    End Function
+
+    Private Shared Function MimeAudioExtension(protocolInfo As String) As String
+        If String.IsNullOrEmpty(protocolInfo) Then Return Nothing
+        ' "http-get:*:audio/mpeg:DLNA.ORG_PN=MP3" -> the third colon-separated field is the MIME type.
+        Dim fields() As String = protocolInfo.Split(":"c)
+        If fields.Length < 3 Then Return Nothing
+        Select Case fields(2).Trim().ToLowerInvariant()
+            Case "audio/mpeg", "audio/mp3", "audio/x-mp3", "audio/mpeg3", "audio/x-mpeg-3"
+                Return ".mp3"
+            Case "audio/flac", "audio/x-flac"
+                Return ".flac"
+            Case "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/aac", "audio/x-aac"
+                Return ".m4a"
+            Case "audio/ogg", "audio/x-ogg", "application/ogg", "audio/vorbis"
+                Return ".ogg"
+            Case "audio/opus"
+                Return ".opus"
+            Case "audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"
+                Return ".wav"
+            Case "audio/x-ms-wma"
+                Return ".wma"
+            Case "audio/x-wavpack", "audio/wavpack"
+                Return ".wv"
+            Case "audio/x-musepack", "audio/musepack"
+                Return ".mpc"
+            Case "audio/x-monkeys-audio", "audio/ape"
+                Return ".ape"
+            Case "audio/aiff", "audio/x-aiff"
+                Return ".aiff"
+        End Select
+        Return Nothing
+    End Function
+
+    ' Forgets (and deletes) the previous cast's copy. An in-flight download is not killed - it checks
+    ' rendererCacheUri before publishing, so it discards its own file and self-cancels.
+    Private Shared Sub ResetRendererCache()
+        Dim stale As String
+        SyncLock rendererCacheLock
+            stale = rendererCacheFile
+            rendererCacheUri = Nothing
+            rendererCacheFile = Nothing
+        End SyncLock
+        rendererPlayingCacheFile = Nothing
+        rendererCacheExpectedBytes = 0
+        DeleteRendererCacheFile(stale)
+    End Sub
+
+    Private Shared Sub StartRendererCacheDownload(uri As String, protocolInfo As String)
+        Dim extension As String = RendererCacheExtension(uri, protocolInfo)
+        If extension Is Nothing Then
+            LogInformation("Renderer:Cache", "no known audio extension for uri=" & uri & ", protocolInfo=" & If(protocolInfo, "?") & " - not caching, seek stays unavailable")
+            Exit Sub
+        End If
+        Dim target As String
+        Try
+            target = IO.Path.Combine(RendererCacheFolder(), "cast-" & Guid.NewGuid().ToString("N") & extension)
+        Catch ex As Exception
+            LogError(ex, "Renderer:StartRendererCacheDownload", "uri=" & uri)
+            Exit Sub
+        End Try
+        SyncLock rendererCacheLock
+            rendererCacheUri = uri
+            rendererCacheFile = Nothing
+            rendererCacheDownloading = True
+        End SyncLock
+        ThreadPool.QueueUserWorkItem(AddressOf RendererCacheWorker, New String() {uri, target})
+    End Sub
+
+    Private Shared Sub RendererCacheWorker(state As Object)
+        Dim parameters() As String = DirectCast(state, String())
+        Dim uri As String = parameters(0)
+        Dim target As String = parameters(1)
+        Dim complete As Boolean = False
+        Try
+            Dim request As HttpWebRequest = DirectCast(WebRequest.Create(uri), HttpWebRequest)
+            request.Timeout = 15000
+            request.ReadWriteTimeout = 30000
+            request.UserAgent = "MusicBee UPnP Plugin"
+            Using response As HttpWebResponse = DirectCast(request.GetResponse(), HttpWebResponse)
+                SyncLock rendererCacheLock
+                    ' Publish the advertised size the moment we know it, so a first play that is
+                    ' waiting can decide whether waiting is worth it at all.
+                    If String.Equals(rendererCacheUri, uri, StringComparison.Ordinal) Then
+                        rendererCacheExpectedBytes = If(response.ContentLength > 0, response.ContentLength, -1L)
+                    End If
+                End SyncLock
+                Using source As IO.Stream = response.GetResponseStream()
+                    Using destination As New IO.FileStream(target, IO.FileMode.Create, IO.FileAccess.Write, IO.FileShare.Read, 65536)
+                        Dim buffer(65535) As Byte
+                        Dim total As Long = 0
+                        Do
+                            Dim count As Integer = source.Read(buffer, 0, buffer.Length)
+                            If count <= 0 Then
+                                complete = (total > 0)
+                                Exit Do
+                            End If
+                            total += count
+                            If total > rendererCacheMaxBytes Then
+                                ' Endless stream, or a file far larger than any track. Give up on
+                                ' caching it rather than filling the disk; playback is unaffected.
+                                LogInformation("Renderer:Cache", "abandoned at " & total & " bytes (cap) uri=" & uri)
+                                Exit Do
+                            End If
+                            destination.Write(buffer, 0, count)
+                        Loop
+                    End Using
+                End Using
+            End Using
+        Catch ex As Exception
+            LogError(ex, "Renderer:RendererCacheWorker", "uri=" & uri)
+        End Try
+        SyncLock rendererCacheLock
+            ' A new cast may have started while this ran - then the copy is already stale.
+            If Not String.Equals(rendererCacheUri, uri, StringComparison.Ordinal) Then
+                complete = False
+            End If
+            rendererCacheDownloading = False
+            rendererCacheFile = If(complete, target, Nothing)
+        End SyncLock
+        If complete Then
+            LogInformation("Renderer:Cache", "ready " & target)
+        Else
+            DeleteRendererCacheFile(target)
+        End If
+    End Sub
+
+    ' The finished local copy of uri, waiting up to timeoutMs for a download still in flight.
+    ' Nothing = no copy will be coming (never started, failed, capped, or superseded).
+    ' beforeFirstPlay = the caller is holding playback back, so give up early on anything that can't
+    ' land in time rather than burning the whole timeout in silence. A Seek passes False: by then the
+    ' listener is already hearing the track and waiting the full grace period costs nothing.
+    Private Shared Function WaitForRendererCache(uri As String, timeoutMs As Integer, beforeFirstPlay As Boolean) As String
+        Dim deadline As Long = DateTime.UtcNow.Ticks + (CLng(timeoutMs) * TimeSpan.TicksPerMillisecond)
+        Do
+            SyncLock rendererCacheLock
+                If Not String.Equals(rendererCacheUri, uri, StringComparison.Ordinal) Then Return Nothing
+                If rendererCacheFile IsNot Nothing Then Return rendererCacheFile
+                If Not rendererCacheDownloading Then Return Nothing
+                If beforeFirstPlay AndAlso rendererCacheExpectedBytes <> 0 Then
+                    ' Headers are in. No length = an endless stream, which will never finish; too big
+                    ' = the timeout would expire before it does. Start streaming instead, now.
+                    If rendererCacheExpectedBytes < 0 OrElse rendererCacheExpectedBytes > rendererCacheWaitMaxBytes Then
+                        LogInformation("Renderer:Cache", "not waiting for local copy, advertised size=" & rendererCacheExpectedBytes)
+                        Return Nothing
+                    End If
+                End If
+            End SyncLock
+            Thread.Sleep(100)
+        Loop While DateTime.UtcNow.Ticks < deadline
+        Return Nothing
+    End Function
+
+    ' NowPlayingList_PlayNow returns before MusicBee has opened the file, and setting a position on a
+    ' track it hasn't opened is a no-op. Wait for it to leave the loading state.
+    Private Shared Sub WaitForRendererPlayback(timeoutMs As Integer)
+        Dim deadline As Long = DateTime.UtcNow.Ticks + (CLng(timeoutMs) * TimeSpan.TicksPerMillisecond)
+        Do
+            Dim state As PlayState = mbApiInterface.Player_GetPlayState()
+            If state = PlayState.Playing OrElse state = PlayState.Paused Then Exit Do
+            Thread.Sleep(50)
+        Loop While DateTime.UtcNow.Ticks < deadline
+    End Sub
 
     ' Milliseconds -> UPnP "H:MM:SS" time string.
     Friend Shared Function FormatUpnpTime(milliseconds As Integer) As String
@@ -224,7 +507,8 @@ Partial Public Class Plugin
             End If
             Dim title As String = Nothing
             Dim durationMs As Integer = 0
-            ParseDidlMetadata(CurrentURIMetaData, title, durationMs)
+            Dim protocolInfo As String = Nothing
+            ParseDidlMetadata(CurrentURIMetaData, title, durationMs, protocolInfo)
             rendererCurrentUri = uri
             rendererCurrentLocalPath = localPath
             rendererCurrentRemoteUri = remoteUri
@@ -233,6 +517,12 @@ Partial Public Class Plugin
             ' A newly-set URI must win over a resume: without this, Play() on a paused player would
             ' resume the PREVIOUS track and silently ignore the one the controller just loaded.
             rendererPendingUri = True
+            ' Drop the previous cast's local copy, then start fetching this one in the background so
+            ' a later Seek has a seekable file to swap onto. Playback itself does not wait for it.
+            ResetRendererCache()
+            If remoteUri IsNot Nothing Then
+                StartRendererCacheDownload(remoteUri, protocolInfo)
+            End If
             LogInformation("Renderer:SetAVTransportURI", If(localPath IsNot Nothing, "loopback path=" & localPath, "remote uri=" & remoteUri) & ", title=" & If(title, "?") & ", duration=" & durationMs)
             request.Response.SendSoapHeadersBody(request)
         End Sub
@@ -247,18 +537,40 @@ Partial Public Class Plugin
                 ' Local path or remote URL, same call: MusicBee streams an http source the way it
                 ' streams internet radio. False = MusicBee refused it outright (unknown format, host
                 ' unreachable); say so instead of leaving the controller thinking playback started.
-                If Not mbApiInterface.NowPlayingList_PlayNow(target) Then
-                    LogInformation("Renderer:Play", "MusicBee refused target=" & target)
+                ' EVERY remote source starts from the local copy when one can be had in time. Not just
+                ' the ones whose URL looks wrong: we only ever see two senders, and how a third names
+                ' its URLs is unknowable - so don't branch on a guess about the sender. Starting local
+                ' also means the track is seekable from the first note, with no swap and no first-
+                ' seconds refusal. Falls back to streaming when the copy can't arrive in time.
+                Dim playingCache As String = Nothing
+                If rendererCurrentLocalPath Is Nothing AndAlso rendererCurrentRemoteUri IsNot Nothing Then
+                    playingCache = WaitForRendererCache(rendererCurrentRemoteUri, rendererCacheFirstPlayWaitMs, True)
+                    If playingCache Is Nothing Then
+                        LogInformation("Renderer:Play", "no local copy within " & rendererCacheFirstPlayWaitMs & "ms - streaming the remote url; title may show as the url and seeking needs a swap")
+                    End If
+                End If
+                Dim startFrom As String = If(playingCache, target)
+                If Not mbApiInterface.NowPlayingList_PlayNow(startFrom) Then
+                    LogInformation("Renderer:Play", "MusicBee refused target=" & startFrom)
                     Throw New SoapException(716, "Resource not found")
                 End If
+                ' Nothing when we started from the remote URL - so a later Seek knows it must swap.
+                rendererPlayingCacheFile = playingCache
+                LogInformation("Renderer:Play", "new uri, started " & If(playingCache IsNot Nothing, "local copy " & playingCache, startFrom))
             ElseIf mbApiInterface.Player_GetPlayState() = PlayState.Paused Then
                 ' Resume.
                 mbApiInterface.Player_PlayPause()
+                LogInformation("Renderer:Play", "resumed")
             ElseIf target IsNot Nothing Then
-                ' Re-play the track already loaded (stopped, then Play again).
+                ' Re-play the track already loaded (stopped, then Play again). ⚠ DIAGNOSTIC: this is
+                ' also the branch a bare Play lands in when a DIFFERENT controller connects and presses
+                ' play before setting its own URI - "target" is then the previous controller's track.
                 mbApiInterface.NowPlayingList_PlayNow(target)
+                rendererPlayingCacheFile = Nothing
+                LogInformation("Renderer:Play", "no new uri - replayed previous target=" & target)
             Else
                 mbApiInterface.Player_PlayPause()
+                LogInformation("Renderer:Play", "nothing loaded - bare play/pause toggle")
             End If
             request.Response.SendSoapHeadersBody(request)
         End Sub
@@ -289,12 +601,58 @@ Partial Public Class Plugin
                          <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String,
                          <UpnpServiceArgument("A_ARG_TYPE_SeekMode")> Unit As String,
                          <UpnpServiceArgument("A_ARG_TYPE_SeekTarget")> Target As String)
-            If String.Equals(Unit, "REL_TIME", StringComparison.OrdinalIgnoreCase) Then
-                Dim ms As Integer = ParseUpnpTime(Target)
-                If ms >= 0 Then
-                    mbApiInterface.Player_SetPosition(ms)
+            ' DIAGNOSTIC (BubbleUPnP slider snaps back after ~1s): the controller polls
+            ' GetPositionInfo and gets the OLD position, so the seek isn't reaching MusicBee. This
+            ' logs every step of the chain so one test says WHICH step fails — the seek mode the
+            ' controller actually sends, whether the target parsed, what Player_SetPosition returned,
+            ' and whether the position actually moved. Guessing twice already cost us enough.
+            Dim positionBefore As Integer = mbApiInterface.Player_GetPosition()
+            If Not String.Equals(Unit, "REL_TIME", StringComparison.OrdinalIgnoreCase) Then
+                ' Our SCPD advertises REL_TIME + TRACK_NR; anything else we genuinely cannot honour.
+                ' Say so instead of answering success and leaving the controller to believe it worked.
+                LogInformation("Renderer:Seek", "unsupported mode=" & If(Unit, "?") & ", target=" & If(Target, "?"))
+                Throw New SoapException(710, "Seek mode not supported")
+            End If
+            Dim ms As Integer = ParseUpnpTime(Target)
+            If ms < 0 Then
+                LogInformation("Renderer:Seek", "unparsable target=" & If(Target, "?"))
+                Throw New SoapException(711, "Illegal seek target")
+            End If
+            ' A remote source is a stream to MusicBee and cannot be repositioned, so swap playback onto
+            ' the background-downloaded copy first - an ordinary local file, which seeks normally.
+            Dim swapped As Boolean = False
+            If rendererCurrentLocalPath Is Nothing AndAlso rendererCurrentRemoteUri IsNot Nothing Then
+                Dim cached As String = WaitForRendererCache(rendererCurrentRemoteUri, rendererCacheGraceMs, False)
+                If cached Is Nothing Then
+                    ' Still downloading (a seek in the first seconds), or never cacheable at all.
+                    ' Refuse honestly - the controller reports it and a second attempt usually works -
+                    ' rather than accepting and letting the slider snap back with no explanation.
+                    LogInformation("Renderer:Seek", "no local copy available for " & rendererCurrentRemoteUri & " - refusing")
+                    Throw New SoapException(710, "Seek mode not supported")
+                End If
+                If Not String.Equals(rendererPlayingCacheFile, cached, StringComparison.OrdinalIgnoreCase) Then
+                    If Not mbApiInterface.NowPlayingList_PlayNow(cached) Then
+                        LogInformation("Renderer:Seek", "MusicBee refused local copy " & cached)
+                        Throw New SoapException(716, "Resource not found")
+                    End If
+                    rendererPlayingCacheFile = cached
+                    swapped = True
+                    WaitForRendererPlayback(1500)
                 End If
             End If
+            ' Retry: right after a swap MusicBee can still be opening the file, and a position set
+            ' then is silently dropped.
+            Dim accepted As Boolean = False
+            Dim positionAfter As Integer = positionBefore
+            For attempt As Integer = 1 To 3
+                accepted = mbApiInterface.Player_SetPosition(ms)
+                positionAfter = mbApiInterface.Player_GetPosition()
+                If Math.Abs(positionAfter - ms) <= 3000 Then Exit For
+                Thread.Sleep(200)
+            Next attempt
+            LogInformation("Renderer:Seek", "target=" & Target & " (" & ms & "ms), accepted=" & accepted & ", position " & positionBefore & "->" & positionAfter & ", source=" & If(rendererCurrentLocalPath IsNot Nothing, "loopback", If(rendererPlayingCacheFile IsNot Nothing, "remote/local-copy", "remote")) & If(swapped, " (swapped)", ""))
+            ' Log the next few position polls too — the snap-back happens in those, not here.
+            rendererPositionLogBudget = 5
             request.Response.SendSoapHeadersBody(request)
         End Sub
 
@@ -315,6 +673,19 @@ Partial Public Class Plugin
         <UpnpServiceArgument(7, "AbsCount", "AbsoluteCounterPosition")>
         Private Sub GetPositionInfo(request As HttpRequest, <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String)
             Dim positionMs As Integer = mbApiInterface.Player_GetPosition()
+            ' DIAGNOSTIC, rate-limited: control points poll this about once a second, so logging
+            ' every call would bury the log. Log only the handful of polls right after a Seek (where
+            ' the snap-back shows up) plus an occasional heartbeat to prove polling is happening.
+            If rendererPositionLogBudget > 0 Then
+                rendererPositionLogBudget -= 1
+                LogInformation("Renderer:GetPositionInfo", "post-seek poll, position=" & positionMs & ", duration=" & RendererDurationMs())
+            Else
+                rendererPositionPollCount += 1
+                If rendererPositionPollCount >= 60 Then
+                    rendererPositionPollCount = 0
+                    LogInformation("Renderer:GetPositionInfo", "heartbeat, position=" & positionMs & ", duration=" & RendererDurationMs())
+                End If
+            End If
             ' Echo the controller's own DIDL back as TrackMetaData - for a remote source it is the
             ' only description of the track that exists on this side.
             request.Response.SendSoapHeadersBody(request, "1", FormatUpnpTime(RendererDurationMs()), rendererCurrentMetaData, If(rendererCurrentUri, ""), FormatUpnpTime(positionMs), FormatUpnpTime(positionMs), "0", "0")
@@ -494,5 +865,9 @@ Partial Public Class Plugin
     Friend Shared rendererCurrentDurationMs As Integer = 0
     ' True between SetAVTransportURI and the Play that consumes it - makes a fresh URI beat a resume.
     Friend Shared rendererPendingUri As Boolean = False
+    ' Diagnostic counters for the position-poll log (see GetPositionInfo). Deliberately unsynchronized:
+    ' a lost increment across HTTP threads only changes how often a diagnostic line is written.
+    Friend Shared rendererPositionLogBudget As Integer = 0
+    Friend Shared rendererPositionPollCount As Integer = 0
 
 End Class
