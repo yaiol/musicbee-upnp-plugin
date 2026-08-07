@@ -245,6 +245,11 @@ Public Class Plugin
                             activeRenderingDevice.ResumePlayback()
                     End Select
                 End If
+            Case NotificationType.TrackChanged
+                ' F2.01 - MusicBee just rolled into a new track. If it is the one we handed it via
+                ' SetNextAVTransportURI, the gapless transition has happened and AVTransport says the
+                ' next URI becomes the current one. Cheap no-op when nothing was queued.
+                PromoteRendererNextIfPlaying(sourceFileUrl)
             Case NotificationType.VolumeMuteChanged
                 If activeRenderingDevice IsNot Nothing Then
                     activeRenderingDevice.SetMute(mbApiInterface.Player_GetMute())

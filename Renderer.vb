@@ -75,15 +75,40 @@ Partial Public Class Plugin
     ' so NowPlaying_GetDuration returns 0 and the controller's progress bar would sit at zero.
     ' The SOAP layer hands us InnerXml (see UpnpService.ProceedControl), so the DIDL arrives
     ' entity-escaped - decode before parsing. Best-effort: bad or absent metadata is not an error.
-    Friend Shared Sub ParseDidlMetadata(metadata As String, ByRef title As String, ByRef durationMs As Integer, ByRef protocolInfo As String, ByRef lyricsUri As String)
-        title = Nothing
-        durationMs = 0
-        protocolInfo = Nothing
-        lyricsUri = Nothing
-        If String.IsNullOrEmpty(metadata) Then Exit Sub
+    ' What the controller told us about the track it is handing over.
+    Friend NotInheritable Class RendererDidl
+        Public Title As String
+        Public DurationMs As Integer
+        Public ProtocolInfo As String
+        Public LyricsUri As String
+        Public UpnpClass As String
+        Public SizeBytes As Long = -1
+
+        ' Live stream (internet radio) rather than a file — the ONE question that decides whether a
+        ' local copy is worth fetching. Downloading a broadcast is pointless twice over: it can never
+        ' finish, and nobody seeks a live stream, so the copy would serve no purpose even if it could.
+        '
+        ' ⚠ This replaced a byte ceiling, and the difference matters. A size limit answers "is this
+        ' big?", which is NOT the question: a 400MB DSD track and a radio stream both read as big, so
+        ' the ceiling abandoned legitimate hi-res material while only delaying the runaway case. UPnP
+        ' names the distinction outright, so ask it directly.
+        Public ReadOnly Property IsBroadcast() As Boolean
+            Get
+                ' The standard class for internet radio: object.item.audioItem.audioBroadcast.
+                If UpnpClass IsNot Nothing AndAlso UpnpClass.IndexOf("audioBroadcast", StringComparison.OrdinalIgnoreCase) >= 0 Then Return True
+                ' A sender that omits the class still gives itself away: a finite file states a size
+                ' or a duration (both senders we have seen state both), a live one can state neither.
+                Return SizeBytes <= 0 AndAlso DurationMs <= 0
+            End Get
+        End Property
+    End Class
+
+    Friend Shared Function ParseDidlMetadata(metadata As String) As RendererDidl
+        Dim didl As New RendererDidl()
+        If String.IsNullOrEmpty(metadata) Then Return didl
         Try
             Dim xml As String = WebUtility.HtmlDecode(metadata).Trim()
-            If Not xml.StartsWith("<") Then Exit Sub
+            If Not xml.StartsWith("<") Then Return didl
             Dim document As New XmlDocument()
             document.LoadXml(xml)
             Dim namespaceManager As New XmlNamespaceManager(document.NameTable)
@@ -91,27 +116,38 @@ Partial Public Class Plugin
             namespaceManager.AddNamespace("dc", "http://purl.org/dc/elements/1.1/")
             namespaceManager.AddNamespace("upnp", "urn:schemas-upnp-org:metadata-1-0/upnp/")
             Dim titleNode As XmlNode = document.SelectSingleNode("//dc:title", namespaceManager)
-            If titleNode IsNot Nothing Then title = titleNode.InnerText
+            If titleNode IsNot Nothing Then didl.Title = titleNode.InnerText
+            ' upnp:class - object.item.audioItem.musicTrack for a file, ...audioBroadcast for radio.
+            Dim classNode As XmlNode = document.SelectSingleNode("//upnp:class", namespaceManager)
+            If classNode IsNot Nothing Then didl.UpnpClass = classNode.InnerText
             Dim resNode As XmlNode = document.SelectSingleNode("//didl:res[@duration]", namespaceManager)
             If resNode IsNot Nothing Then
                 ' res@duration is the same "H:MM:SS[.f]" shape AVTransport uses elsewhere.
                 Dim ms As Integer = ParseUpnpTime(resNode.Attributes("duration").Value)
-                If ms > 0 Then durationMs = ms
+                If ms > 0 Then didl.DurationMs = ms
             End If
             ' protocolInfo ("http-get:*:audio/mpeg:*") names the MIME type - the only reliable way to
             ' pick a file extension for the local copy when the URL has none.
             Dim protocolNode As XmlNode = document.SelectSingleNode("//didl:res[@protocolInfo]", namespaceManager)
-            If protocolNode IsNot Nothing Then protocolInfo = protocolNode.Attributes("protocolInfo").Value
+            If protocolNode IsNot Nothing Then didl.ProtocolInfo = protocolNode.Attributes("protocolInfo").Value
+            ' res@size - the byte length, stated BEFORE we connect. Says "this is a finite file" and
+            ' by how much, so the first play can judge the wait without waiting on HTTP headers.
+            Dim sizeNode As XmlNode = document.SelectSingleNode("//didl:res[@size]", namespaceManager)
+            If sizeNode IsNot Nothing Then
+                Dim bytes As Long
+                If Long.TryParse(sizeNode.Attributes("size").Value, bytes) AndAlso bytes > 0 Then didl.SizeBytes = bytes
+            End If
             ' upnp:lyricsURI - the ONE standard place a controller can point at an external .lrc.
             ' Optional in the spec and widely omitted; if a sender does provide it we could fetch it
             ' alongside the audio and drop it beside the temp copy as a sidecar. Read here so the
             ' log can answer "does this sender send one?" from a real cast rather than a guess.
             Dim lyricsNode As XmlNode = document.SelectSingleNode("//upnp:lyricsURI", namespaceManager)
-            If lyricsNode IsNot Nothing Then lyricsUri = lyricsNode.InnerText
+            If lyricsNode IsNot Nothing Then didl.LyricsUri = lyricsNode.InnerText
         Catch ex As Exception
             LogError(ex, "ParseDidlMetadata")
         End Try
-    End Sub
+        Return didl
+    End Function
 
     ' Duration to report to the controller. MusicBee's own value wins when it has one (local file);
     ' for a remote URL it has none, so fall back to what the controller told us in the DIDL.
@@ -139,7 +175,12 @@ Partial Public Class Plugin
     ' The good property of doing both: an endless stream (internet radio) simply never finishes
     ' downloading, so seeking stays unavailable and nothing hangs waiting to buffer. The size cap
     ' below is what stops such a stream filling the disk - it is a safety valve, not a tuning knob.
-    Private Const rendererCacheMaxBytes As Long = 300L * 1024L * 1024L
+    ' Last-resort backstop against a sender that lies or states nothing — NOT a judgement about track
+    ' size. The live-stream question is answered properly by the DIDL (RendererDidl.IsBroadcast), so
+    ' this only has to sit above anything real: a 20-minute 24/96 FLAC is ~375MB and a 10-minute DSD64
+    ' ~420MB, which the old 300MB ceiling abandoned outright. Never lower it to "save space" — space
+    ' was never the problem it solved.
+    Private Const rendererCacheMaxBytes As Long = 2L * 1024L * 1024L * 1024L
     ' How long a Seek waits for an in-flight download before giving up and reporting 710. Covers the
     ' case of seeking within a second or two of starting a track.
     Private Const rendererCacheGraceMs As Integer = 2000
@@ -157,6 +198,8 @@ Partial Public Class Plugin
     ' URI, gave up instantly and streamed the remote URL - losing exactly the title and the seeking
     ' this cache exists to provide. On an album that is nearly every track. Keyed by URI and holding
     ' the last few, an announcement can no longer destroy the copy another command is about to need.
+    ' (Two entries is the requirement - see the eviction comment in StartRendererCacheDownload for
+    ' why that number comes from the protocol, and what the third is actually for.)
     ' (Evicting is always safe: MusicBee reads a track into memory, so deleting a temp file it is
     ' playing does not interrupt it.)
     Private Const rendererCacheMaxEntries As Integer = 3
@@ -296,10 +339,16 @@ Partial Public Class Plugin
         Return Nothing
     End Function
 
-    Private Shared Sub StartRendererCacheDownload(uri As String, protocolInfo As String)
-        Dim extension As String = RendererCacheExtension(uri, protocolInfo)
+    Private Shared Sub StartRendererCacheDownload(uri As String, didl As RendererDidl)
+        ' A live stream is the one thing never worth fetching: it cannot finish, and nobody seeks
+        ' radio. Asking the DIDL what the thing IS beats guessing from how big it has grown.
+        If didl.IsBroadcast Then
+            LogInformation("Renderer:Cache", "live stream (class=" & If(didl.UpnpClass, "none") & ", size=" & didl.SizeBytes & ", duration=" & didl.DurationMs & ") - not caching, seek stays unavailable")
+            Exit Sub
+        End If
+        Dim extension As String = RendererCacheExtension(uri, didl.ProtocolInfo)
         If extension Is Nothing Then
-            LogInformation("Renderer:Cache", "no known audio extension for uri=" & uri & ", protocolInfo=" & If(protocolInfo, "?") & " - not caching, seek stays unavailable")
+            LogInformation("Renderer:Cache", "no known audio extension for uri=" & uri & ", protocolInfo=" & If(didl.ProtocolInfo, "?") & " - not caching, seek stays unavailable")
             Exit Sub
         End If
         Dim target As String
@@ -314,9 +363,18 @@ Partial Public Class Plugin
             ' Already held or already coming - a controller re-announcing the same track (Symfonium
             ' does, on every queue nudge) must not start a second download of it.
             If FindRendererCacheEntry(uri) IsNot Nothing Then Exit Sub
-            rendererCacheEntries.Add(New RendererCacheEntry(uri, target))
-            ' Oldest out first. The cap bounds the temp folder; three is comfortably more than the
-            ' "current + next" a controller keeps in flight.
+            Dim entry As New RendererCacheEntry(uri, target)
+            ' Seed the size from the DIDL: the sender states it up front, so the first play can judge
+            ' whether waiting is worth it immediately instead of waiting on the HTTP headers first.
+            If didl.SizeBytes > 0 Then entry.ExpectedBytes = didl.SizeBytes
+            rendererCacheEntries.Add(entry)
+            ' Oldest out first. TWO is the real requirement, and it is a protocol fact rather than an
+            ' observation: AVTransport gives a renderer exactly one CURRENT and one NEXT URI slot,
+            ' with no queue behind them, so a controller has nowhere to put a third and no reason to
+            ' send a track it is not about to play. The third slot here buys one concrete thing -
+            ' skipping BACKWARDS: Previous makes the controller re-announce the previous track's URI,
+            ' which is then still on disk instead of being fetched again. That, at ~13MB, is the whole
+            ' justification; it is not headroom against some unseen controller.
             Do While rendererCacheEntries.Count > rendererCacheMaxEntries
                 evicted.Add(rendererCacheEntries(0).Path)
                 rendererCacheEntries.RemoveAt(0)
@@ -542,11 +600,9 @@ Partial Public Class Plugin
                     Throw New SoapException(716, "Resource not found")
                 End If
             End If
-            Dim title As String = Nothing
-            Dim durationMs As Integer = 0
-            Dim protocolInfo As String = Nothing
-            Dim lyricsUri As String = Nothing
-            ParseDidlMetadata(CurrentURIMetaData, title, durationMs, protocolInfo, lyricsUri)
+            Dim didl As RendererDidl = ParseDidlMetadata(CurrentURIMetaData)
+            Dim title As String = didl.Title
+            Dim durationMs As Integer = didl.DurationMs
             rendererCurrentUri = uri
             rendererCurrentLocalPath = localPath
             rendererCurrentRemoteUri = remoteUri
@@ -555,18 +611,59 @@ Partial Public Class Plugin
             ' A newly-set URI must win over a resume: without this, Play() on a paused player would
             ' resume the PREVIOUS track and silently ignore the one the controller just loaded.
             rendererPendingUri = True
+            ' A new CURRENT track invalidates whatever was announced as following the old one.
+            ClearRendererNext()
             ' Drop the previous cast's local copy, then start fetching this one in the background so
             ' a later Seek has a seekable file to swap onto. Playback itself does not wait for it.
             If remoteUri IsNot Nothing Then
-                StartRendererCacheDownload(remoteUri, protocolInfo)
+                StartRendererCacheDownload(remoteUri, didl)
             End If
             LogInformation("Renderer:SetAVTransportURI", If(localPath IsNot Nothing, "loopback path=" & localPath, "remote uri=" & remoteUri) & ", title=" & If(title, "?") & ", duration=" & durationMs)
             ' DIAGNOSTIC (external lyrics): does this controller advertise a .lrc at all? Reports the
             ' standard upnp:lyricsURI, then dumps the raw DIDL so a NON-standard element can be spotted
             ' too - several servers invent their own rather than use the spec's. Capped: a DIDL is
             ' normally under 2 KB, but nothing guarantees it and this must not flood the log.
-            LogInformation("Renderer:DIDL", "lyricsURI=" & If(lyricsUri, "(none)") & ", raw=" &
+            LogInformation("Renderer:DIDL", "class=" & If(didl.UpnpClass, "(none)") & ", size=" & didl.SizeBytes & ", broadcast=" & didl.IsBroadcast & ", lyricsURI=" & If(didl.LyricsUri, "(none)") & ", raw=" &
                 If(rendererCurrentMetaData.Length > 4000, rendererCurrentMetaData.Substring(0, 4000) & "…[truncated]", rendererCurrentMetaData))
+            request.Response.SendSoapHeadersBody(request)
+        End Sub
+
+        ' The second URI slot - "here is what follows the current track". Implementing it is what lets
+        ' a controller pre-load properly instead of faking it with a second SetAVTransportURI, and it
+        ' is what makes an album cast from a phone play without a gap at every track boundary.
+        Private Sub SetNextAVTransportURI(request As HttpRequest,
+                                          <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String,
+                                          <UpnpServiceArgument("NextAVTransportURI")> NextURI As String,
+                                          <UpnpServiceArgument("NextAVTransportURIMetaData")> NextURIMetaData As String)
+            Dim uri As String = WebUtility.HtmlDecode(If(NextURI, "")).Trim()
+            If uri.Length = 0 Then
+                ' An empty NextURI is the defined way to say "forget it" - not an error.
+                ClearRendererNext()
+                LogInformation("Renderer:SetNextAVTransportURI", "cleared")
+                request.Response.SendSoapHeadersBody(request)
+                Exit Sub
+            End If
+            Dim localPath As String = ResolveLoopbackFile(uri)
+            Dim remoteUri As String = Nothing
+            If localPath Is Nothing Then
+                remoteUri = ResolveRemoteUri(uri)
+                If remoteUri Is Nothing Then
+                    LogInformation("Renderer:SetNextAVTransportURI", "refused unplayable uri=" & uri)
+                    Throw New SoapException(716, "Resource not found")
+                End If
+            End If
+            Dim didl As RendererDidl = ParseDidlMetadata(NextURIMetaData)
+            rendererNextUri = uri
+            rendererNextLocalPath = localPath
+            rendererNextRemoteUri = remoteUri
+            rendererNextMetaData = WebUtility.HtmlDecode(If(NextURIMetaData, ""))
+            rendererNextDurationMs = didl.DurationMs
+            rendererQueuedNextFile = Nothing
+            ' Start fetching it now - there is a whole track's playing time to get it down, so the
+            ' next track can begin from a local copy rather than a stream, like the current one.
+            If remoteUri IsNot Nothing Then StartRendererCacheDownload(remoteUri, didl)
+            ThreadPool.QueueUserWorkItem(AddressOf RendererQueueNextWorker, uri)
+            LogInformation("Renderer:SetNextAVTransportURI", If(localPath IsNot Nothing, "loopback path=" & localPath, "remote uri=" & remoteUri) & ", title=" & If(didl.Title, "?") & ", duration=" & didl.DurationMs)
             request.Response.SendSoapHeadersBody(request)
         End Sub
 
@@ -747,7 +844,7 @@ Partial Public Class Plugin
         <UpnpServiceArgument(7, "RecordMedium", "RecordStorageMedium")>
         <UpnpServiceArgument(8, "WriteStatus", "RecordMediumWriteStatus")>
         Private Sub GetMediaInfo(request As HttpRequest, <UpnpServiceArgument("A_ARG_TYPE_InstanceID")> InstanceID As String)
-            request.Response.SendSoapHeadersBody(request, "1", FormatUpnpTime(RendererDurationMs()), If(rendererCurrentUri, ""), rendererCurrentMetaData, "", "", "NETWORK", "NOT_IMPLEMENTED", "NOT_IMPLEMENTED")
+            request.Response.SendSoapHeadersBody(request, "1", FormatUpnpTime(RendererDurationMs()), If(rendererCurrentUri, ""), rendererCurrentMetaData, If(rendererNextUri, ""), rendererNextMetaData, "NETWORK", "NOT_IMPLEMENTED", "NOT_IMPLEMENTED")
         End Sub
 
         <UpnpServiceArgument(0, "PlayMode", "CurrentPlayMode")>
@@ -914,6 +1011,93 @@ Partial Public Class Plugin
     Friend Shared rendererCurrentDurationMs As Integer = 0
     ' True between SetAVTransportURI and the Play that consumes it - makes a fresh URI beat a resume.
     Friend Shared rendererPendingUri As Boolean = False
+
+    ' ── The NEXT track (SetNextAVTransportURI) ───────────────────────────────────────────────────
+    ' AVTransport gives a renderer a second slot so a controller can say "here is what follows" and
+    ' the renderer can roll into it with no gap. It is OPTIONAL, and we did not implement it - so a
+    ' controller wanting to pre-load had nowhere to put the track and did the only thing left: a
+    ' second SetAVTransportURI, 150ms after the first (Symfonium, observed 2026-08-03). That is what
+    ' a missing next slot looks like from the outside, and it cost us a whole bug.
+    '
+    ' The transition itself is MusicBee's job, not ours: we hand it the track with
+    ' NowPlayingList_QueueNext and its own player crosses the boundary gaplessly. We only promote the
+    ' bookkeeping afterwards, on TrackChanged.
+    Friend Shared rendererNextUri As String = Nothing
+    Friend Shared rendererNextLocalPath As String = Nothing
+    Friend Shared rendererNextRemoteUri As String = Nothing
+    Friend Shared rendererNextMetaData As String = ""
+    Friend Shared rendererNextDurationMs As Integer = 0
+    ' What we actually handed MusicBee - the file whose arrival identifies the transition.
+    Friend Shared rendererQueuedNextFile As String = Nothing
+    ' A whole track's playing time is available before the next one is needed, so the wait for its
+    ' local copy can be generous - unlike the first play, nobody is listening to silence.
+    Private Const rendererNextCopyWaitMs As Integer = 30000
+
+    Private Shared Sub ClearRendererNext()
+        rendererNextUri = Nothing
+        rendererNextLocalPath = Nothing
+        rendererNextRemoteUri = Nothing
+        rendererNextMetaData = ""
+        rendererNextDurationMs = 0
+        rendererQueuedNextFile = Nothing
+    End Sub
+
+    ' Called on MusicBee's TrackChanged. When the track that just started is the one we queued, the
+    ' gapless transition has happened - so per AVTransport the next URI BECOMES the current one and
+    ' the next slot empties. Doing it here means a controller polling GetMediaInfo/GetPositionInfo
+    ' sees the truth without having to be told, which is the whole point of the second slot.
+    Friend Shared Sub PromoteRendererNextIfPlaying(sourceFileUrl As String)
+        If rendererQueuedNextFile Is Nothing OrElse sourceFileUrl Is Nothing Then Exit Sub
+        If Not String.Equals(sourceFileUrl, rendererQueuedNextFile, StringComparison.OrdinalIgnoreCase) Then Exit Sub
+        Dim playedFromCopy As Boolean = (rendererNextLocalPath Is Nothing AndAlso
+                                         Not String.Equals(rendererQueuedNextFile, rendererNextRemoteUri, StringComparison.Ordinal))
+        rendererCurrentUri = rendererNextUri
+        rendererCurrentLocalPath = rendererNextLocalPath
+        rendererCurrentRemoteUri = rendererNextRemoteUri
+        rendererCurrentMetaData = rendererNextMetaData
+        rendererCurrentDurationMs = rendererNextDurationMs
+        ' If the queued file was the downloaded copy we are already ON it, so a later Seek must not
+        ' swap again; if it was the remote URL, Seek still has to.
+        rendererPlayingCacheFile = If(playedFromCopy, rendererQueuedNextFile, Nothing)
+        rendererPendingUri = False
+        LogInformation("Renderer:Transition", "next promoted to current: " & If(rendererCurrentUri, "?"))
+        ClearRendererNext()
+    End Sub
+
+    ' Hands MusicBee the next track, preferring its downloaded copy. Runs off the SOAP thread because
+    ' it deliberately WAITS: NowPlayingList_PlayNow REPLACES the now-playing list, so queueing before
+    ' the current track has actually started would put the next track into a list about to be thrown
+    ' away. So wait for playback to be running, then queue.
+    Private Shared Sub RendererQueueNextWorker(state As Object)
+        Dim uri As String = TryCast(state, String)
+        If uri Is Nothing Then Exit Sub
+        Try
+            Dim deadline As Long = DateTime.UtcNow.Ticks + (20000L * TimeSpan.TicksPerMillisecond)
+            Do While DateTime.UtcNow.Ticks < deadline
+                ' A newer SetNextAVTransportURI supersedes this one - drop out silently.
+                If Not String.Equals(rendererNextUri, uri, StringComparison.Ordinal) Then Exit Sub
+                If Not rendererPendingUri AndAlso mbApiInterface.Player_GetPlayState() = PlayState.Playing Then Exit Do
+                Thread.Sleep(200)
+            Loop
+            If Not String.Equals(rendererNextUri, uri, StringComparison.Ordinal) Then Exit Sub
+            Dim target As String = rendererNextLocalPath
+            If target Is Nothing Then
+                ' Same reasons as the current track: a local copy carries the title and can be sought.
+                target = WaitForRendererCache(rendererNextRemoteUri, rendererNextCopyWaitMs, False)
+                If target Is Nothing Then target = rendererNextRemoteUri
+            End If
+            If target Is Nothing Then Exit Sub
+            If Not String.Equals(rendererNextUri, uri, StringComparison.Ordinal) Then Exit Sub
+            If mbApiInterface.NowPlayingList_QueueNext(target) Then
+                rendererQueuedNextFile = target
+                LogInformation("Renderer:QueueNext", "queued " & target)
+            Else
+                LogInformation("Renderer:QueueNext", "MusicBee refused " & target)
+            End If
+        Catch ex As Exception
+            LogError(ex, "Renderer:RendererQueueNextWorker", "uri=" & uri)
+        End Try
+    End Sub
     ' Diagnostic counters for the position-poll log (see GetPositionInfo). Deliberately unsynchronized:
     ' a lost increment across HTTP threads only changes how often a diagnostic line is written.
     Friend Shared rendererPositionLogBudget As Integer = 0

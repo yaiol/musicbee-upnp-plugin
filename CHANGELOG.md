@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.6 - 2026-08-03
+- An album sent from a phone now plays without a gap between tracks. The plugin accepts the "here is what comes next" instruction the standard defines for exactly this, fetches that track while the current one is still playing, and hands it to MusicBee's own player to cross the boundary. Until now that instruction was not accepted at all, so a controlling app had nowhere to put the upcoming track and resorted to announcing it as if it were the current one — which is also what caused the album problem fixed in the previous release
+- Internet radio sent to MusicBee is no longer downloaded. The plugin now reads what the controlling app says the track *is* — the standard distinguishes a music file from a live broadcast — instead of guessing from how large the download has grown
+- Long high-resolution tracks are no longer refused a local copy. Any download above 300 MB used to be abandoned as a runaway stream, which caught genuine DSD and 24-bit material — a 20-minute high-resolution movement or a 10-minute DSD track both exceed it — and left them unable to be moved through. With live broadcasts now identified properly there is no need for a size limit, and the remaining one sits far above any real track
+- The controlling app is now told which track is queued to play next, rather than being told there isn't one
+- Renderer logging now records what the controlling app says a track is, so unexpected behaviour can be traced from the log
+
 ## 2.0.5 - 2026-08-03
 - The volume on your phone and the volume in MusicBee now mean the same thing. The plugin never told controlling apps what its maximum volume was, so each one had to guess: Symfonium settled on 69, which made its 100% reach only 69% in MusicBee while MusicBee's own 100% read back as 144% on the phone. The renderer now declares the 0–100 range the standard asks for, so both ends agree and the phone's volume buttons can reach the top
 - Casting a whole album now keeps working past the first track. A controlling app announces the next track a fraction of a second after the current one, and that announcement was discarding the copy being fetched for the track about to play — so most tracks fell back to playing over the network, losing their title and the ability to jump through them. Copies for several tracks are now kept side by side, so an announcement can no longer cancel the one in use
