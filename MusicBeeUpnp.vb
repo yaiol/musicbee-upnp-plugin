@@ -108,7 +108,12 @@ Public Class Plugin
         ' bare ProductName() with NO tag. The product name itself never contains "yaiol" (all of this is yaiol).
         about.Name = UpdateCheck.ProductName() & " (yaiol)"
         about.Description = Plugin.L("PluginDescription")
-        about.Author = "Steven Mayall"
+        ' ⚠ The author line MusicBee shows in Preferences → Plugins. It is a support address as much
+        ' as a credit - it is where a user looks to decide who to report a bug to - so it names the
+        ' fork's maintainer, not the original author. Credit for the original belongs in the docs and
+        ' in AssemblyCopyright, which keeps his 2014 claim alongside ours. It read "Steven Mayall"
+        ' until 2026-08-09, three lines under a Name that already said "(yaiol)".
+        about.Author = "yaiol"
         about.TargetApplication = ""
         about.Type = PluginType.Upnp
         ' ⚠ CLAUDE: the version MusicBee shows in Preferences → Plugins - source it from

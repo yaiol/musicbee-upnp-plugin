@@ -8,11 +8,13 @@ Imports System.Runtime.InteropServices
 
 ' Review the values of the assembly attributes
 
-<Assembly: AssemblyTitle("MusicBee Upnp/DNLA server")> 
+<Assembly: AssemblyTitle("UPnP/DLNA plugin for MusicBee - server, player and renderer")>
 <Assembly: AssemblyDescription("")> 
-<Assembly: AssemblyCompany("Steven Mayall")> 
+<Assembly: AssemblyCompany("yaiol")>
 <Assembly: AssemblyProduct("MusicBee UPnP Plugin")> 
-<Assembly: AssemblyCopyright("Copyright ©Steven Mayall  2014")> 
+' ⚠ BOTH claims, and never replace his with ours: the original code is still his and his 2014
+' copyright on it does not lapse because the fork exists. Ours covers what the fork added.
+<Assembly: AssemblyCopyright("Copyright © Steven Mayall 2014, © yaiol 2026")>
 <Assembly: AssemblyTrademark("")> 
 
 <Assembly: ComVisible(False)>

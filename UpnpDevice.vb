@@ -5,6 +5,22 @@ Imports System.Reflection
 Imports System.Globalization
 
 Partial Public Class Plugin
+
+    ' ── UPnP device-description identity ─────────────────────────────────────────────────────────
+    ' What the plugin tells the network it IS. Every control app that discovers us reads this and
+    ' shows it as the device's maker and model, so it is an identity claim, not a credit — the
+    ' attribution to the original author belongs in the docs, where it now is. It said
+    ' "Steven Mayall" until 2026-08-09, which meant a phone on someone else's network introduced
+    ' this plugin as manufactured by him.
+    '
+    ' Declared HERE, once, because the description is written from two places (the server in
+    ' UpnpDevice, the renderer in UpnpServer) and they must never disagree about who we are.
+    ' modelName + modelNumber deliberately come from the assembly rather than literals — the same
+    ' rule as AppId, so app-info propagates a rename and /app-git a version bump. modelNumber was a
+    ' hardcoded "1.0" through every release up to 2.0.7.
+    Friend Const DeviceManufacturer As String = "yaiol"
+    Friend Const DeviceModelDescription As String = "MusicBee UPnP Plugin (Server, Player, Renderer)"
+
     Friend MustInherit Class UpnpDevice
         Public ReadOnly Udn As Guid
         Public ReadOnly DeviceType As String = "urn:schemas-upnp-org:device:MediaServer:1"
@@ -56,17 +72,19 @@ Partial Public Class Plugin
             writer.WriteElementString("deviceType", DeviceType)
             If Not wmcCompat Then
                 writer.WriteElementString("friendlyName", Settings.ServerName)
-                writer.WriteElementString("manufacturer", "Steven Mayall")
-                writer.WriteElementString("manufacturerURL", "http://getmusicbee.com/")
-                writer.WriteElementString("modelDescription", "MusicBee UPnP Server")
-                writer.WriteElementString("modelName", "MusicBee UPnP Plugin")
+                writer.WriteElementString("manufacturer", DeviceManufacturer)
+                writer.WriteElementString("manufacturerURL", UpdateCheck.SITE)
+                writer.WriteElementString("modelDescription", DeviceModelDescription)
+                writer.WriteElementString("modelName", UpdateCheck.ProductName())
                 writer.WriteElementString("modelURL", "http://getmusicbee.com/")
-                writer.WriteElementString("modelNumber", "1.0")
+                writer.WriteElementString("modelNumber", UpdateCheck.DisplayVersion())
             Else
                 writer.WriteElementString("friendlyName", Settings.ServerName & ":1")
-                writer.WriteElementString("manufacturer", "Steven Mayall")
-                ''writer.WriteElementString("manufacturer", "Microsoft Corporation")
-                writer.WriteElementString("modelDescription", "MusicBee UPnP Server")
+                writer.WriteElementString("manufacturer", DeviceManufacturer)
+                ' ⚠ modelName + modelNumber below stay "Windows Media Player Sharing" / "12" ON PURPOSE:
+                ' this branch exists to look like WMP to a Windows Media Connect client. They are the
+                ' impersonation itself, not stale metadata - do not "correct" them.
+                writer.WriteElementString("modelDescription", DeviceModelDescription)
                 writer.WriteElementString("modelName", "Windows Media Player Sharing")
                 writer.WriteElementString("modelNumber", "12")
             End If

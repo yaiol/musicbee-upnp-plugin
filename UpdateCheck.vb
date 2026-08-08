@@ -15,7 +15,9 @@ Partial Public Class Plugin
         Private Sub New()
         End Sub
 
-        Private Const SITE As String = "https://apps.yaiol.com"
+        ' Public because the UPnP device description advertises it as manufacturerURL - the plugin's
+        ' home, not MusicBee's. One constant, so a domain change never leaves a stale copy behind.
+        Public Const SITE As String = "https://apps.yaiol.com"
         Private Const ENDPOINT As String = "https://apps.yaiol.com/p"
 
         ' The app id from info.json - the slug in every published URL (apps.yaiol.com/<lang>/p/<id>/,

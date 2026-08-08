@@ -290,5 +290,5 @@ Build configuration: `Debug | x86` for local work → `main/bin/Debug/mb_UPnP_ya
 
 ## 10. Credits
 
-- Original plugin by **Steven Mayall**. The vast majority of this codebase is his work.
+- Original plugin by **Steven Mayall**. This fork rewrote the library browsing and the settings dialog and added the renderer, but the UPnP, HTTP and SSDP core it all stands on is still largely his code.
 - The UPnP 2025 fork by **BoringName** for ideas and bug catalogs.
