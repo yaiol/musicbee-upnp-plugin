@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.7 - 2026-08-08
+- A larger track sent from a phone now keeps its title and stays scrubbable. The plugin waits for its local copy while that copy is still arriving, however long it takes, instead of deciding in advance that a file was too big to be worth waiting for. A 65 MB track was refused on that basis and then finished downloading a second later — well within the wait it never used — so it played over the network with a web address for a title and a position slider that did nothing
+- The wait now follows the download rather than a stopwatch: while bytes keep arriving it keeps waiting, and it gives up only when the transfer actually stalls. A fixed delay could not tell a slow transfer from a stuck one, so whatever value it held was wrong for somebody — too short on a big file, needlessly long on a dead connection. Stalling is now detected in about a second and a half, faster than the old fixed wait, while a healthy transfer is allowed to finish
+- Remove the download size ceiling entirely. It was an assumption about network speed, which the plugin has no way to know
+- Fix a latent fault where a download finishing after its slot had been reused could mark the wrong track as ready
+
 ## 2.0.6 - 2026-08-03
 - An album sent from a phone now plays without a gap between tracks. The plugin accepts the "here is what comes next" instruction the standard defines for exactly this, fetches that track while the current one is still playing, and hands it to MusicBee's own player to cross the boundary. Until now that instruction was not accepted at all, so a controlling app had nowhere to put the upcoming track and resorted to announcing it as if it were the current one — which is also what caused the album problem fixed in the previous release
 - Internet radio sent to MusicBee is no longer downloaded. The plugin now reads what the controlling app says the track *is* — the standard distinguishes a music file from a live broadcast — instead of guessing from how large the download has grown

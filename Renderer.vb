@@ -183,12 +183,15 @@ Partial Public Class Plugin
     Private Const rendererCacheMaxBytes As Long = 2L * 1024L * 1024L * 1024L
     ' How long a Seek waits for an in-flight download before giving up and reporting 710. Covers the
     ' case of seeking within a second or two of starting a track.
-    Private Const rendererCacheGraceMs As Integer = 2000
-    ' How long the FIRST play waits for the local copy. Long enough for a normal track over a LAN
-    ' (measured around half a second), short enough that a slow sender falls back to streaming rather
-    ' than leaving the user staring at silence. Exceeding it costs the title and instant seeking,
-    ' never the playback itself.
-    Private Const rendererCacheFirstPlayWaitMs As Integer = 3000
+    ' No bytes for this long = the transfer is stuck, not merely slow. The only thing worth
+    ' abandoning a download for.
+    Private Const rendererCacheStallMs As Integer = 1500
+    ' Ceilings, NOT budgets - a download that keeps advancing is waited on until it finishes, and
+    ' these only stop a pathological trickle holding a SOAP action open. The first play is the one
+    ' the listener hears as silence, so it gives up sooner than a Seek, where the track is already
+    ' audible and a moment's pause costs nothing.
+    Private Const rendererCacheFirstPlayCeilingMs As Integer = 15000
+    Private Const rendererCacheGraceCeilingMs As Integer = 20000
     ' Never hardcode the product name. UpdateCheck.ProductName() reads AssemblyProduct, which app-info
     ' writes from info.json - so a rename propagates here like it does everywhere else.
     Private Shared ReadOnly rendererCacheLock As New Object
@@ -207,9 +210,13 @@ Partial Public Class Plugin
     ' The local copy MusicBee is currently playing after a swap. Nothing while playing the remote
     ' URL, so a later Seek knows it still has to swap.
     Private Shared rendererPlayingCacheFile As String = Nothing
-    ' Above this we don't hold up playback waiting for the copy - the wait would just run its timeout
-    ' down and fall back to streaming anyway. Seeking still works once the download lands.
-    Private Const rendererCacheWaitMaxBytes As Long = 64L * 1024L * 1024L
+    ' ⚠ There is deliberately NO size threshold on "should the first play wait for the copy?".
+    ' There was one (64MB), reasoning that a bigger file could not land inside the wait. That is a
+    ' guess about the user's BANDWIDTH, and it was wrong: a 65.6MB FLAC was refused the wait and
+    ' then finished downloading 1.1 SECONDS later, well inside the 3s window it never used - so the
+    ' track played from the network, showed its URL instead of its title, and could not be sought
+    ' (reported 2026-08-07). The timeout already answers the same question without guessing: wait,
+    ' and if it has not arrived, fall back. Never reintroduce a byte ceiling here.
 
     Friend NotInheritable Class RendererCacheEntry
         Public ReadOnly Uri As String
@@ -219,7 +226,10 @@ Partial Public Class Plugin
         Public Ready As Boolean = False
         ' What the sender advertised: 0 = headers not seen yet, -1 = none given (an endless stream),
         ' >0 = the real length. Lets the first play tell "a second away" from "never going to finish".
-        Public ExpectedBytes As Long = 0
+        ' Bytes written so far. The wait watches this ADVANCE rather than watching a clock: a
+        ' download that is still moving deserves more time however long it ends up taking, and one
+        ' that has stalled deserves none however recently it started.
+        Public BytesReceived As Long = 0
         Public Sub New(uri As String, path As String)
             Me.Uri = uri
             Me.Path = path
@@ -363,11 +373,7 @@ Partial Public Class Plugin
             ' Already held or already coming - a controller re-announcing the same track (Symfonium
             ' does, on every queue nudge) must not start a second download of it.
             If FindRendererCacheEntry(uri) IsNot Nothing Then Exit Sub
-            Dim entry As New RendererCacheEntry(uri, target)
-            ' Seed the size from the DIDL: the sender states it up front, so the first play can judge
-            ' whether waiting is worth it immediately instead of waiting on the HTTP headers first.
-            If didl.SizeBytes > 0 Then entry.ExpectedBytes = didl.SizeBytes
-            rendererCacheEntries.Add(entry)
+            rendererCacheEntries.Add(New RendererCacheEntry(uri, target))
             ' Oldest out first. TWO is the real requirement, and it is a protocol fact rather than an
             ' observation: AVTransport gives a renderer exactly one CURRENT and one NEXT URI slot,
             ' with no queue behind them, so a controller has nowhere to put a third and no reason to
@@ -391,20 +397,17 @@ Partial Public Class Plugin
         Dim uri As String = parameters(0)
         Dim target As String = parameters(1)
         Dim complete As Boolean = False
+        Dim entry As RendererCacheEntry
+        SyncLock rendererCacheLock
+            entry = FindRendererCacheEntry(uri)
+        End SyncLock
+        If entry Is Nothing Then Exit Sub          ' evicted before we even started
         Try
             Dim request As HttpWebRequest = DirectCast(WebRequest.Create(uri), HttpWebRequest)
             request.Timeout = 15000
             request.ReadWriteTimeout = 30000
             request.UserAgent = "MusicBee UPnP Plugin"
             Using response As HttpWebResponse = DirectCast(request.GetResponse(), HttpWebResponse)
-                SyncLock rendererCacheLock
-                    ' Publish the advertised size the moment we know it, so a first play that is
-                    ' waiting can decide whether waiting is worth it at all.
-                    Dim opening As RendererCacheEntry = FindRendererCacheEntry(uri)
-                    If opening IsNot Nothing Then
-                        opening.ExpectedBytes = If(response.ContentLength > 0, response.ContentLength, -1L)
-                    End If
-                End SyncLock
                 Using source As IO.Stream = response.GetResponseStream()
                     Using destination As New IO.FileStream(target, IO.FileMode.Create, IO.FileAccess.Write, IO.FileShare.Read, 65536)
                         Dim buffer(65535) As Byte
@@ -423,6 +426,10 @@ Partial Public Class Plugin
                                 Exit Do
                             End If
                             destination.Write(buffer, 0, count)
+                            ' Publish progress so a waiting first play can see the download moving.
+                            ' Unsynchronised on purpose: a Long write is atomic on every runtime we
+                            ' target, and a reader one buffer behind changes nothing it decides.
+                            entry.BytesReceived = total
                         Loop
                     End Using
                 End Using
@@ -431,14 +438,15 @@ Partial Public Class Plugin
             LogError(ex, "Renderer:RendererCacheWorker", "uri=" & uri)
         End Try
         SyncLock rendererCacheLock
-            ' The entry may have been evicted while this ran - then the copy is already stale.
-            Dim entry As RendererCacheEntry = FindRendererCacheEntry(uri)
-            If entry Is Nothing OrElse Not String.Equals(entry.Path, target, StringComparison.OrdinalIgnoreCase) Then
+            ' The entry may have been evicted (and possibly replaced) while this ran - then the copy
+            ' is already stale. Re-look it up rather than trusting the reference we started with.
+            Dim current As RendererCacheEntry = FindRendererCacheEntry(uri)
+            If current Is Nothing OrElse Not String.Equals(current.Path, target, StringComparison.OrdinalIgnoreCase) Then
                 complete = False
             Else
-                entry.Downloading = False
-                entry.Ready = complete
-                If Not complete Then rendererCacheEntries.Remove(entry)
+                current.Downloading = False
+                current.Ready = complete
+                If Not complete Then rendererCacheEntries.Remove(current)
             End If
         End SyncLock
         If complete Then
@@ -448,30 +456,39 @@ Partial Public Class Plugin
         End If
     End Sub
 
-    ' The finished local copy of uri, waiting up to timeoutMs for a download still in flight.
-    ' Nothing = no copy will be coming (never started, failed, capped, or superseded).
-    ' beforeFirstPlay = the caller is holding playback back, so give up early on anything that can't
-    ' land in time rather than burning the whole timeout in silence. A Seek passes False: by then the
-    ' listener is already hearing the track and waiting the full grace period costs nothing.
-    Private Shared Function WaitForRendererCache(uri As String, timeoutMs As Integer, beforeFirstPlay As Boolean) As String
-        Dim deadline As Long = DateTime.UtcNow.Ticks + (CLng(timeoutMs) * TimeSpan.TicksPerMillisecond)
+    ' The finished local copy of uri. Nothing = none is coming (never started, failed, superseded)
+    ' or it stalled.
+    '
+    ' ⚠ Waits on PROGRESS, not on a clock. A fixed timeout cannot tell "slow" from "stuck", so any
+    ' value picked is wrong for somebody: 3s refused a 65.6MB FLAC that arrived in 1.1s on a fast
+    ' link, while on a stalled transfer the same 3s is 3s of silence for nothing. Stalling is the
+    ' only thing worth abandoning, and bytes-received says so directly. So: keep waiting while the
+    ' download is moving; give up once it has not moved for stallMs; and cap the whole thing with
+    ' ceilingMs purely so a pathologically slow trickle cannot hold a SOAP action open forever.
+    ' A download that keeps advancing gets as long as it needs.
+    Private Shared Function WaitForRendererCache(uri As String, stallMs As Integer, ceilingMs As Integer) As String
+        Dim ceiling As Long = DateTime.UtcNow.Ticks + (CLng(ceilingMs) * TimeSpan.TicksPerMillisecond)
+        Dim lastBytes As Long = -1
+        Dim lastProgress As Long = DateTime.UtcNow.Ticks
         Do
+            Dim entry As RendererCacheEntry
             SyncLock rendererCacheLock
-                Dim entry As RendererCacheEntry = FindRendererCacheEntry(uri)
+                entry = FindRendererCacheEntry(uri)
                 If entry Is Nothing Then Return Nothing
                 If entry.Ready Then Return entry.Path
                 If Not entry.Downloading Then Return Nothing
-                If beforeFirstPlay AndAlso entry.ExpectedBytes <> 0 Then
-                    ' Headers are in. No length = an endless stream, which will never finish; too big
-                    ' = the timeout would expire before it does. Start streaming instead, now.
-                    If entry.ExpectedBytes < 0 OrElse entry.ExpectedBytes > rendererCacheWaitMaxBytes Then
-                        LogInformation("Renderer:Cache", "not waiting for local copy, advertised size=" & entry.ExpectedBytes)
-                        Return Nothing
-                    End If
-                End If
             End SyncLock
+            Dim seen As Long = entry.BytesReceived
+            If seen <> lastBytes Then
+                lastBytes = seen
+                lastProgress = DateTime.UtcNow.Ticks
+            ElseIf (DateTime.UtcNow.Ticks - lastProgress) > (CLng(stallMs) * TimeSpan.TicksPerMillisecond) Then
+                LogInformation("Renderer:Cache", "download stalled at " & seen & " bytes - not waiting further")
+                Return Nothing
+            End If
             Thread.Sleep(100)
-        Loop While DateTime.UtcNow.Ticks < deadline
+        Loop While DateTime.UtcNow.Ticks < ceiling
+        LogInformation("Renderer:Cache", "still downloading after " & ceilingMs & "ms (" & lastBytes & " bytes) - starting without the copy")
         Return Nothing
     End Function
 
@@ -684,7 +701,7 @@ Partial Public Class Plugin
                 ' seconds refusal. Falls back to streaming when the copy can't arrive in time.
                 Dim playingCache As String = Nothing
                 If rendererCurrentLocalPath Is Nothing AndAlso rendererCurrentRemoteUri IsNot Nothing Then
-                    playingCache = WaitForRendererCache(rendererCurrentRemoteUri, rendererCacheFirstPlayWaitMs, True)
+                    playingCache = WaitForRendererCache(rendererCurrentRemoteUri, rendererCacheStallMs, rendererCacheFirstPlayCeilingMs)
                     If playingCache Is Nothing Then
                         ' Deliberately not "waited Nms": the wait also returns at once when there is
                         ' no entry, or when the headers said it can't land in time. Claiming a
@@ -765,7 +782,7 @@ Partial Public Class Plugin
             ' the background-downloaded copy first - an ordinary local file, which seeks normally.
             Dim swapped As Boolean = False
             If rendererCurrentLocalPath Is Nothing AndAlso rendererCurrentRemoteUri IsNot Nothing Then
-                Dim cached As String = WaitForRendererCache(rendererCurrentRemoteUri, rendererCacheGraceMs, False)
+                Dim cached As String = WaitForRendererCache(rendererCurrentRemoteUri, rendererCacheStallMs, rendererCacheGraceCeilingMs)
                 If cached Is Nothing Then
                     ' Still downloading (a seek in the first seconds), or never cacheable at all.
                     ' Refuse honestly - the controller reports it and a second attempt usually works -
@@ -1031,7 +1048,7 @@ Partial Public Class Plugin
     Friend Shared rendererQueuedNextFile As String = Nothing
     ' A whole track's playing time is available before the next one is needed, so the wait for its
     ' local copy can be generous - unlike the first play, nobody is listening to silence.
-    Private Const rendererNextCopyWaitMs As Integer = 30000
+    Private Const rendererNextCopyCeilingMs As Integer = 30000
 
     Private Shared Sub ClearRendererNext()
         rendererNextUri = Nothing
@@ -1083,7 +1100,7 @@ Partial Public Class Plugin
             Dim target As String = rendererNextLocalPath
             If target Is Nothing Then
                 ' Same reasons as the current track: a local copy carries the title and can be sought.
-                target = WaitForRendererCache(rendererNextRemoteUri, rendererNextCopyWaitMs, False)
+                target = WaitForRendererCache(rendererNextRemoteUri, rendererCacheStallMs, rendererNextCopyCeilingMs)
                 If target Is Nothing Then target = rendererNextRemoteUri
             End If
             If target Is Nothing Then Exit Sub
