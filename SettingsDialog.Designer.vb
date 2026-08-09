@@ -507,7 +507,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevProfileName
         '
         Me.lblDevProfileName.AutoSize = True
-        Me.lblDevProfileName.Location = New System.Drawing.Point(11, 17)
+        Me.lblDevProfileName.Location = New System.Drawing.Point(12, 17)
         Me.lblDevProfileName.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevProfileName.Name = "lblDevProfileName"
         Me.lblDevProfileName.Size = New System.Drawing.Size(49, 17)
@@ -517,7 +517,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'txtDevProfileName
         '
         Me.txtDevProfileName.Enabled = False
-        Me.txtDevProfileName.Location = New System.Drawing.Point(352, 14)
+        Me.txtDevProfileName.Location = New System.Drawing.Point(352, 12)
         Me.txtDevProfileName.Margin = New System.Windows.Forms.Padding(4)
         Me.txtDevProfileName.Name = "txtDevProfileName"
         Me.txtDevProfileName.Size = New System.Drawing.Size(272, 22)
@@ -526,7 +526,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevUserAgent
         '
         Me.lblDevUserAgent.AutoSize = True
-        Me.lblDevUserAgent.Location = New System.Drawing.Point(11, 52)
+        Me.lblDevUserAgent.Location = New System.Drawing.Point(12, 49)
         Me.lblDevUserAgent.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevUserAgent.Name = "lblDevUserAgent"
         Me.lblDevUserAgent.Size = New System.Drawing.Size(249, 17)
@@ -536,7 +536,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'txtDevUserAgent
         '
         Me.txtDevUserAgent.Enabled = False
-        Me.txtDevUserAgent.Location = New System.Drawing.Point(352, 49)
+        Me.txtDevUserAgent.Location = New System.Drawing.Point(352, 44)
         Me.txtDevUserAgent.Margin = New System.Windows.Forms.Padding(4)
         Me.txtDevUserAgent.Name = "txtDevUserAgent"
         Me.txtDevUserAgent.Size = New System.Drawing.Size(272, 22)
@@ -546,7 +546,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.lblDevCapabilities.AutoSize = True
         Me.lblDevCapabilities.Font = New System.Drawing.Font("Microsoft Sans Serif", 7.8!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.lblDevCapabilities.Location = New System.Drawing.Point(12, 91)
+        Me.lblDevCapabilities.Location = New System.Drawing.Point(12, 81)
         Me.lblDevCapabilities.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevCapabilities.Name = "lblDevCapabilities"
         Me.lblDevCapabilities.Size = New System.Drawing.Size(224, 17)
@@ -556,7 +556,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevPictureSize
         '
         Me.lblDevPictureSize.AutoSize = True
-        Me.lblDevPictureSize.Location = New System.Drawing.Point(11, 120)
+        Me.lblDevPictureSize.Location = New System.Drawing.Point(12, 113)
         Me.lblDevPictureSize.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevPictureSize.Name = "lblDevPictureSize"
         Me.lblDevPictureSize.Size = New System.Drawing.Size(146, 17)
@@ -565,7 +565,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         'txtDevPictureSize
         '
-        Me.txtDevPictureSize.Location = New System.Drawing.Point(352, 114)
+        Me.txtDevPictureSize.Location = New System.Drawing.Point(352, 108)
         Me.txtDevPictureSize.Margin = New System.Windows.Forms.Padding(4)
         Me.txtDevPictureSize.MaxLength = 4
         Me.txtDevPictureSize.Name = "txtDevPictureSize"
@@ -585,7 +585,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevSampleRateFrom
         '
         Me.lblDevSampleRateFrom.AutoSize = True
-        Me.lblDevSampleRateFrom.Location = New System.Drawing.Point(12, 151)
+        Me.lblDevSampleRateFrom.Location = New System.Drawing.Point(12, 145)
         Me.lblDevSampleRateFrom.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevSampleRateFrom.Name = "lblDevSampleRateFrom"
         Me.lblDevSampleRateFrom.Size = New System.Drawing.Size(133, 17)
@@ -596,7 +596,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.cboDevSampleRateFrom.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.cboDevSampleRateFrom.FormattingEnabled = True
-        Me.cboDevSampleRateFrom.Location = New System.Drawing.Point(352, 148)
+        Me.cboDevSampleRateFrom.Location = New System.Drawing.Point(352, 138)
         Me.cboDevSampleRateFrom.Margin = New System.Windows.Forms.Padding(4)
         Me.cboDevSampleRateFrom.Name = "cboDevSampleRateFrom"
         Me.cboDevSampleRateFrom.Size = New System.Drawing.Size(88, 24)
@@ -605,7 +605,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevSampleRateTo
         '
         Me.lblDevSampleRateTo.AutoSize = True
-        Me.lblDevSampleRateTo.Location = New System.Drawing.Point(353, 154)
+        Me.lblDevSampleRateTo.Location = New System.Drawing.Point(448, 145)
         Me.lblDevSampleRateTo.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevSampleRateTo.Name = "lblDevSampleRateTo"
         Me.lblDevSampleRateTo.Size = New System.Drawing.Size(24, 17)
@@ -616,7 +616,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.cboDevSampleRateTo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.cboDevSampleRateTo.FormattingEnabled = True
-        Me.cboDevSampleRateTo.Location = New System.Drawing.Point(483, 149)
+        Me.cboDevSampleRateTo.Location = New System.Drawing.Point(536, 138)
         Me.cboDevSampleRateTo.Margin = New System.Windows.Forms.Padding(4)
         Me.cboDevSampleRateTo.Name = "cboDevSampleRateTo"
         Me.cboDevSampleRateTo.Size = New System.Drawing.Size(88, 24)
@@ -625,7 +625,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevChannels
         '
         Me.lblDevChannels.AutoSize = True
-        Me.lblDevChannels.Location = New System.Drawing.Point(12, 186)
+        Me.lblDevChannels.Location = New System.Drawing.Point(12, 177)
         Me.lblDevChannels.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevChannels.Name = "lblDevChannels"
         Me.lblDevChannels.Size = New System.Drawing.Size(71, 17)
@@ -635,7 +635,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevStereoOnly
         '
         Me.chkDevStereoOnly.AutoSize = True
-        Me.chkDevStereoOnly.Location = New System.Drawing.Point(352, 183)
+        Me.chkDevStereoOnly.Location = New System.Drawing.Point(352, 173)
         Me.chkDevStereoOnly.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevStereoOnly.Name = "chkDevStereoOnly"
         Me.chkDevStereoOnly.Size = New System.Drawing.Size(100, 21)
@@ -646,7 +646,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevMaxBitDepth
         '
         Me.lblDevMaxBitDepth.AutoSize = True
-        Me.lblDevMaxBitDepth.Location = New System.Drawing.Point(12, 215)
+        Me.lblDevMaxBitDepth.Location = New System.Drawing.Point(12, 209)
         Me.lblDevMaxBitDepth.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevMaxBitDepth.Name = "lblDevMaxBitDepth"
         Me.lblDevMaxBitDepth.Size = New System.Drawing.Size(129, 17)
@@ -657,7 +657,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.cboDevMaxBitDepth.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.cboDevMaxBitDepth.FormattingEnabled = True
-        Me.cboDevMaxBitDepth.Location = New System.Drawing.Point(352, 212)
+        Me.cboDevMaxBitDepth.Location = New System.Drawing.Point(352, 202)
         Me.cboDevMaxBitDepth.Margin = New System.Windows.Forms.Padding(4)
         Me.cboDevMaxBitDepth.MaxDropDownItems = 2
         Me.cboDevMaxBitDepth.Name = "cboDevMaxBitDepth"
@@ -697,7 +697,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevTranscodeFormat
         '
         Me.lblDevTranscodeFormat.AutoSize = True
-        Me.lblDevTranscodeFormat.Location = New System.Drawing.Point(32, 44)
+        Me.lblDevTranscodeFormat.Location = New System.Drawing.Point(11, 45)
         Me.lblDevTranscodeFormat.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevTranscodeFormat.Name = "lblDevTranscodeFormat"
         Me.lblDevTranscodeFormat.Size = New System.Drawing.Size(99, 17)
@@ -708,7 +708,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.cboDevTranscodeFormat.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.cboDevTranscodeFormat.FormattingEnabled = True
-        Me.cboDevTranscodeFormat.Location = New System.Drawing.Point(345, 41)
+        Me.cboDevTranscodeFormat.Location = New System.Drawing.Point(345, 38)
         Me.cboDevTranscodeFormat.Margin = New System.Windows.Forms.Padding(4)
         Me.cboDevTranscodeFormat.MaxDropDownItems = 3
         Me.cboDevTranscodeFormat.Name = "cboDevTranscodeFormat"
@@ -719,7 +719,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevTranscodeSampleRate
         '
         Me.lblDevTranscodeSampleRate.AutoSize = True
-        Me.lblDevTranscodeSampleRate.Location = New System.Drawing.Point(32, 78)
+        Me.lblDevTranscodeSampleRate.Location = New System.Drawing.Point(11, 73)
         Me.lblDevTranscodeSampleRate.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevTranscodeSampleRate.Name = "lblDevTranscodeSampleRate"
         Me.lblDevTranscodeSampleRate.Size = New System.Drawing.Size(133, 17)
@@ -730,7 +730,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.cboDevTranscodeSampleRate.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.cboDevTranscodeSampleRate.FormattingEnabled = True
-        Me.cboDevTranscodeSampleRate.Location = New System.Drawing.Point(345, 75)
+        Me.cboDevTranscodeSampleRate.Location = New System.Drawing.Point(345, 66)
         Me.cboDevTranscodeSampleRate.Margin = New System.Windows.Forms.Padding(4)
         Me.cboDevTranscodeSampleRate.Name = "cboDevTranscodeSampleRate"
         Me.cboDevTranscodeSampleRate.Size = New System.Drawing.Size(139, 24)
@@ -740,7 +740,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevForceNativeStream
         '
         Me.chkDevForceNativeStream.AutoSize = True
-        Me.chkDevForceNativeStream.Location = New System.Drawing.Point(11, 114)
+        Me.chkDevForceNativeStream.Location = New System.Drawing.Point(11, 101)
         Me.chkDevForceNativeStream.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevForceNativeStream.Name = "chkDevForceNativeStream"
         Me.chkDevForceNativeStream.Size = New System.Drawing.Size(286, 21)
@@ -751,7 +751,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevForceTranscoding
         '
         Me.chkDevForceTranscoding.AutoSize = True
-        Me.chkDevForceTranscoding.Location = New System.Drawing.Point(11, 143)
+        Me.chkDevForceTranscoding.Location = New System.Drawing.Point(11, 133)
         Me.chkDevForceTranscoding.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevForceTranscoding.Name = "chkDevForceTranscoding"
         Me.chkDevForceTranscoding.Size = New System.Drawing.Size(424, 21)
@@ -762,7 +762,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevEnableSoundEffects
         '
         Me.chkDevEnableSoundEffects.AutoSize = True
-        Me.chkDevEnableSoundEffects.Location = New System.Drawing.Point(11, 172)
+        Me.chkDevEnableSoundEffects.Location = New System.Drawing.Point(11, 165)
         Me.chkDevEnableSoundEffects.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevEnableSoundEffects.Name = "chkDevEnableSoundEffects"
         Me.chkDevEnableSoundEffects.Size = New System.Drawing.Size(505, 21)
@@ -773,7 +773,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevEnableReplayGain
         '
         Me.chkDevEnableReplayGain.AutoSize = True
-        Me.chkDevEnableReplayGain.Location = New System.Drawing.Point(11, 201)
+        Me.chkDevEnableReplayGain.Location = New System.Drawing.Point(11, 197)
         Me.chkDevEnableReplayGain.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevEnableReplayGain.Name = "chkDevEnableReplayGain"
         Me.chkDevEnableReplayGain.Size = New System.Drawing.Size(630, 21)
@@ -814,7 +814,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevDoNotClearNextUri
         '
         Me.chkDevDoNotClearNextUri.AutoSize = True
-        Me.chkDevDoNotClearNextUri.Location = New System.Drawing.Point(11, 46)
+        Me.chkDevDoNotClearNextUri.Location = New System.Drawing.Point(11, 47)
         Me.chkDevDoNotClearNextUri.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevDoNotClearNextUri.Name = "chkDevDoNotClearNextUri"
         Me.chkDevDoNotClearNextUri.Size = New System.Drawing.Size(334, 21)
@@ -825,8 +825,9 @@ Partial Friend NotInheritable Class SettingsDialog
         'lblDevProblems
         '
         Me.lblDevProblems.AutoSize = True
+        Me.lblDevProblems.FlatStyle = System.Windows.Forms.FlatStyle.Flat
         Me.lblDevProblems.Font = New System.Drawing.Font("Microsoft Sans Serif", 7.8!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.lblDevProblems.Location = New System.Drawing.Point(8, 85)
+        Me.lblDevProblems.Location = New System.Drawing.Point(8, 77)
         Me.lblDevProblems.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDevProblems.Name = "lblDevProblems"
         Me.lblDevProblems.Size = New System.Drawing.Size(220, 17)
@@ -836,7 +837,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevDoNotUseRawPcm
         '
         Me.chkDevDoNotUseRawPcm.AutoSize = True
-        Me.chkDevDoNotUseRawPcm.Location = New System.Drawing.Point(11, 106)
+        Me.chkDevDoNotUseRawPcm.Location = New System.Drawing.Point(11, 103)
         Me.chkDevDoNotUseRawPcm.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevDoNotUseRawPcm.Name = "chkDevDoNotUseRawPcm"
         Me.chkDevDoNotUseRawPcm.Size = New System.Drawing.Size(168, 21)
@@ -847,7 +848,7 @@ Partial Friend NotInheritable Class SettingsDialog
         'chkDevForceLittleEndianPcm
         '
         Me.chkDevForceLittleEndianPcm.AutoSize = True
-        Me.chkDevForceLittleEndianPcm.Location = New System.Drawing.Point(11, 135)
+        Me.chkDevForceLittleEndianPcm.Location = New System.Drawing.Point(11, 133)
         Me.chkDevForceLittleEndianPcm.Margin = New System.Windows.Forms.Padding(4)
         Me.chkDevForceLittleEndianPcm.Name = "chkDevForceLittleEndianPcm"
         Me.chkDevForceLittleEndianPcm.Size = New System.Drawing.Size(250, 21)
@@ -869,7 +870,7 @@ Partial Friend NotInheritable Class SettingsDialog
         '
         Me.cboDevContentLength.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.cboDevContentLength.FormattingEnabled = True
-        Me.cboDevContentLength.Location = New System.Drawing.Point(216, 160)
+        Me.cboDevContentLength.Location = New System.Drawing.Point(216, 156)
         Me.cboDevContentLength.Margin = New System.Windows.Forms.Padding(4)
         Me.cboDevContentLength.Name = "cboDevContentLength"
         Me.cboDevContentLength.Size = New System.Drawing.Size(139, 24)
