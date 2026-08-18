@@ -1,4 +1,4 @@
-' app-icon tag for icons-cockpit (do not remove): data-icon="yaiol:musicbee-upnp-plugin" -> res/icons/custom/apps/musicbee-upnp-plugin.svg
+' data-icon="yaiol:musicbee-upnp-plugin"
 Imports System.Runtime.InteropServices
 Imports System.Net
 Imports System.Net.NetworkInformation
