@@ -12,8 +12,6 @@ Imports System.Runtime.InteropServices
 <Assembly: AssemblyDescription("")> 
 <Assembly: AssemblyCompany("yaiol")>
 <Assembly: AssemblyProduct("MusicBee UPnP Plugin")> 
-' ⚠ BOTH claims, and never replace his with ours: the original code is still his and his 2014
-' copyright on it does not lapse because the fork exists. Ours covers what the fork added.
 <Assembly: AssemblyCopyright("Copyright © Steven Mayall 2014, © yaiol 2026")>
 <Assembly: AssemblyTrademark("")> 
 
@@ -31,7 +29,7 @@ Imports System.Runtime.InteropServices
 '
 ' You can specify all the values or you can default the Build and Revision Numbers 
 ' by using the '*' as shown below:
-' <Assembly: AssemblyVersion("2.0.5.0")> 
+' <Assembly: AssemblyVersion("1.0.*")> 
 
 <Assembly: AssemblyVersion("2.0.0.0")> 
-<Assembly: AssemblyFileVersion("2.0.7.0")>
+<Assembly: AssemblyFileVersion("2.0.8.0")>

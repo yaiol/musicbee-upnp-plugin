@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.8 — 2026-08-22
+
+- Server and renderer device descriptions now identify the plugin itself: manufacturer "yaiol", the plugin's own site as manufacturerURL, and a model description naming all three roles — control apps previously introduced it as made by the original author, pointing at MusicBee's website
+- Model name and model number in the device description are read from the assembly; the number was a hardcoded "1.0" through every release up to 2.0.7 and now reports the real plugin version
+- MusicBee → Preferences → Plugins lists "yaiol" as the author
+- Assembly title, company and copyright updated — the copyright carries both claims (© Steven Mayall 2014, © yaiol 2026)
+- Device Profiles tab realigned: labels and fields share one left edge, vertical spacing tightened, and the sample-rate "to" label and combo moved clear of the "from" combo they were sitting on top of
+- Update check identifies itself with the app id and version instead of a fixed string
+- README credits state what the fork rewrote and what remains the original author's code
+- Trim over-long explanatory comments in MusicBeeUpnp.vb, AssemblyInfo.vb and UpnpDevice.vb, and restore the stock AssemblyVersion example that had been edited to a real-looking version
+
 ## 2.0.7 - 2026-08-08
 - A larger track sent from a phone now keeps its title and stays scrubbable. The plugin waits for its local copy while that copy is still arriving, however long it takes, instead of deciding in advance that a file was too big to be worth waiting for. A 65 MB track was refused on that basis and then finished downloading a second later — well within the wait it never used — so it played over the network with a web address for a title and a position slider that did nothing
 - The wait now follows the download rather than a stopwatch: while bytes keep arriving it keeps waiting, and it gives up only when the transfer actually stalls. A fixed delay could not tell a slow transfer from a stuck one, so whatever value it held was wrong for somebody — too short on a big file, needlessly long on a dead connection. Stalling is now detected in about a second and a half, faster than the old fixed wait, while a healthy transfer is allowed to finish

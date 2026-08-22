@@ -6,18 +6,8 @@ Imports System.Globalization
 
 Partial Public Class Plugin
 
-    ' ── UPnP device-description identity ─────────────────────────────────────────────────────────
-    ' What the plugin tells the network it IS. Every control app that discovers us reads this and
-    ' shows it as the device's maker and model, so it is an identity claim, not a credit — the
-    ' attribution to the original author belongs in the docs, where it now is. It said
-    ' "Steven Mayall" until 2026-08-09, which meant a phone on someone else's network introduced
-    ' this plugin as manufactured by him.
-    '
-    ' Declared HERE, once, because the description is written from two places (the server in
-    ' UpnpDevice, the renderer in UpnpServer) and they must never disagree about who we are.
-    ' modelName + modelNumber deliberately come from the assembly rather than literals — the same
-    ' rule as AppId, so app-info propagates a rename and /app-git a version bump. modelNumber was a
-    ' hardcoded "1.0" through every release up to 2.0.7.
+    ' UPnP device-description identity. Declared once here — the description is written from two
+    ' places (UpnpDevice, UpnpServer) and they must not disagree.
     Friend Const DeviceManufacturer As String = "yaiol"
     Friend Const DeviceModelDescription As String = "MusicBee UPnP Plugin (Server, Player, Renderer)"
 

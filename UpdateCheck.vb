@@ -85,13 +85,14 @@ Partial Public Class Plugin
         ' Returns False on any failure - caller no-ops.
         Public Shared Function TryGetLatestVersion(appId As String, ByRef version As String) As Boolean
             version = Nothing
+            If Not String.IsNullOrEmpty(Environment.GetEnvironmentVariable("YAIOL_DEV")) Then Return False
             Try
                 Try
                     ServicePointManager.SecurityProtocol = ServicePointManager.SecurityProtocol Or SecurityProtocolType.Tls12
                 Catch
                 End Try
                 Using wc As New WebClient()
-                    wc.Headers.Add("User-Agent", "musicbee-upnp-yaiol")
+                    wc.Headers.Add("User-Agent", AppId & "/" & DisplayVersion())
                     Dim json As String = wc.DownloadString(ENDPOINT & "/" & appId & "/latest.json")
                     Dim m As Match = versionRegex.Match(json)
                     If Not m.Success Then Return False
