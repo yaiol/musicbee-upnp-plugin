@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.9 — 2026-08-23
+
+- The What's new and Download links in the update notice open in MusicBee's own language
+
 ## 2.0.8 — 2026-08-22
 
 - Server and renderer device descriptions now identify the plugin itself: manufacturer "yaiol", the plugin's own site as manufacturerURL, and a model description naming all three roles — control apps previously introduced it as made by the original author, pointing at MusicBee's website

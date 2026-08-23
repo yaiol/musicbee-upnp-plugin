@@ -1986,17 +1986,16 @@ Partial Friend NotInheritable Class SettingsDialog
     End Sub
 
     Private Sub lnkUpdateWhatsNew_LinkClicked(sender As Object, e As LinkLabelLinkClickedEventArgs)
-        OpenUpdatePage("latest")
+        OpenUrl(Plugin.UpdateCheck.GetUrl(Plugin.UpdateCheck.AppId, Plugin.Localisation.DetectMusicBeeLanguage(), "help/releases"))
     End Sub
 
     Private Sub lnkUpdateDownload_LinkClicked(sender As Object, e As LinkLabelLinkClickedEventArgs)
-        OpenUpdatePage("download")
+        OpenUrl(Plugin.UpdateCheck.GetUrl(Plugin.UpdateCheck.AppId, Plugin.Localisation.DetectMusicBeeLanguage(), "download"))
     End Sub
 
-    Private Sub OpenUpdatePage(page As String)
+    Private Sub OpenUrl(url As String)
         Try
-            Dim culture As String = Plugin.Localisation.DetectMusicBeeLanguage()
-            System.Diagnostics.Process.Start(Plugin.UpdateCheck.PageUrl(Plugin.UpdateCheck.AppId, culture, page))
+            System.Diagnostics.Process.Start(url)
         Catch
             ' silent
         End Try
@@ -2008,7 +2007,7 @@ Partial Friend NotInheritable Class SettingsDialog
     Private Sub btnHelp_Click(sender As Object, e As EventArgs)
         Try
             Dim culture As String = Plugin.Localisation.DetectMusicBeeLanguage()
-            System.Diagnostics.Process.Start(Plugin.UpdateCheck.HelpUrl(Plugin.UpdateCheck.AppId, culture))
+            System.Diagnostics.Process.Start(Plugin.UpdateCheck.GetUrl(Plugin.UpdateCheck.AppId, culture, "help"))
         Catch
             ' silent
         End Try

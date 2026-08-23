@@ -29,10 +29,6 @@ Partial Public Class Plugin
         ' Source repository - same slug (github.com/yaiol/<AppId>).
         Public Const RepoUrl As String = "https://github.com/yaiol/" & AppId
 
-        ' Languages the website is actually published in - the plugin localizes into
-        ' more, but release pages only exist for these; fall back to en otherwise.
-        ' (Keep in sync with update-check.js SITE_LANGS.)
-        Private Shared ReadOnly SiteLangs As String() = New String() {"en", "fr", "es", "de"}
 
         Private Shared ReadOnly versionRegex As New Regex("""version""\s*:\s*""([^""]+)""", RegexOptions.Compiled Or RegexOptions.CultureInvariant)
 
@@ -129,33 +125,10 @@ Partial Public Class Plugin
             Return out
         End Function
 
-        ' Map a .NET culture code to a published site language (base, en fallback).
-        Public Shared Function SiteLang(cultureCode As String) As String
-            If String.IsNullOrEmpty(cultureCode) Then Return "en"
-            Dim baseCode As String = cultureCode.Split("-"c)(0).ToLowerInvariant()
-            For Each l As String In SiteLangs
-                If l = baseCode Then Return baseCode
-            Next
-            Return "en"
-        End Function
-
-        ' Localized release page URL. page = "latest" (What's new) or "download".
-        ' Both pages carry identical content by design.
-        Public Shared Function PageUrl(appId As String, cultureCode As String, page As String) As String
-            Return SITE & "/" & SiteLang(cultureCode) & "/p/" & appId & "/" & page & ".html"
-        End Function
-
-        ' Localized help page URL - apps.yaiol.com/<lang>/p/<appId>/help/.
-        ' Sends the FULL UI culture (already hyphenated by .NET, e.g. pt-BR/zh-CN),
-        ' NOT the collapsed site-language: help is published in far more languages
-        ' than the 4 showcase-chrome langs, and nginx falls back to the EN help page
-        ' for any language not built. This mirrors the Electron / browser-ext help
-        ' button, which sends its full UI language (hyphen-normalized). SiteLang's
-        ' collapse-to-base is only right for PageUrl (release/download pages, which
-        ' exist solely in the 4 showcase languages) - do not use it here.
-        Public Shared Function HelpUrl(appId As String, cultureCode As String) As String
-            Dim webLang As String = If(String.IsNullOrEmpty(cultureCode), "en", cultureCode)
-            Return SITE & "/" & webLang & "/p/" & appId & "/help/"
+        ' retrieve site url
+        Public Shared Function GetUrl(appId As String, cultureCode As String, page As String) As String
+            Dim p As String = If(page, "").Trim("/"c)
+            Return SITE & "/" & cultureCode & "/p/" & appId & "/" & If(p = "", "", p & "/")
         End Function
 
     End Class
