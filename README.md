@@ -1,12 +1,74 @@
-# MusicBee UPnP — yaiol fork
+<p align="center">
+  <img src="docs/assets/logo.png" alt="MusicBee UPnP Plugin" width="110" height="110">
+</p>
 
-Open-source fork of Steven Mayall's original MusicBee UPnP plugin. Adds richer library navigation (filter-based root containers, AlbumArtist-sort grouping, album artwork in DIDL responses) and ports forward the most useful playback fixes from the closed-source [UPnP 2025 fork](https://getmusicbee.com/addons/plugins/534/upnp-2025/).
+<h1 align="center">MusicBee UPnP Plugin</h1>
 
-This README explains what every option in the settings dialog actually does. UPnP/DLNA terminology is largely the original authors' jargon; the goal here is to translate it into plain English so you know what to tick.
+<div align="center">
+  <strong>MusicBee's UPnP plugin, opened up.</strong><br>
+  Your filter tabs as browsable roots, <code>Sort Album Artist</code> grouping and album artwork — an open-source fork of the original.
+</div>
+
+<br>
+
+<!-- readme:nav -->
+
+<div align="center">
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/yaiol/musicbee-upnp-plugin?color=5a4fff&label=release&style=flat-square" alt="Release"></a>
+  <a href="../../releases"><img src="https://img.shields.io/github/downloads/yaiol/musicbee-upnp-plugin/total?color=5a4fff&label=downloads&style=flat-square" alt="Downloads"></a>
+</div>
+
+<h3 align="center">
+  <a href="https://apps.yaiol.com/en/p/musicbee-upnp-plugin/">Website</a>
+  <span>&nbsp;·&nbsp;</span>
+  <a href="#install">Install</a>
+  <span>&nbsp;·&nbsp;</span>
+  <a href="#what-it-is">Features</a>
+  <span>&nbsp;·&nbsp;</span>
+  <a href="#documentation">Documentation</a>
+  <span>&nbsp;·&nbsp;</span>
+  <a href="#settings-reference">Settings reference</a>
+  <span>&nbsp;·&nbsp;</span>
+  <a href="#build-from-source">Development</a>
+</h3>
+
+<div align="center">
+  <sub><a href="https://apps.yaiol.com/en/p/musicbee-upnp-plugin/help/"><b>Help in 22 languages</b></a></sub>
+</div>
+
+<!-- /readme:nav -->
 
 ---
 
-## 1. What this plugin does
+<p align="center">
+  <img src="docs/assets/hero.png" alt="A UPnP client browsing a MusicBee library through the plugin, filter tabs as root containers" width="900">
+</p>
+
+---
+
+## Install
+
+<div align="center">
+  <a href="../../releases/latest"><img src="https://img.shields.io/badge/Download-mb__UPnP__yaiol.dll-5a4fff?style=for-the-badge&logo=windows&logoColor=white" alt="Download the plugin"></a>
+</div>
+
+1. Download `mb_UPnP_yaiol.dll` from the [latest release](https://github.com/yaiol/musicbee-upnp-plugin/releases/latest).
+2. Copy it into your MusicBee plugins folder, typically:
+   `C:\Users\<you>\AppData\Roaming\MusicBee\Plugins\`
+3. Restart MusicBee.
+4. **Edit → Preferences → Plugins** → find **MusicBee UPnP (yaiol)** → click **Configure**.
+5. If the original `mb_Upnp.dll` is also enabled, disable it.
+
+Requires MusicBee 3.5+ on Windows 10 or newer.
+
+---
+
+## What it is
+
+Open-source fork of Steven Mayall's original MusicBee UPnP plugin. It adds richer library navigation
+(filter-based root containers, AlbumArtist-sort grouping, album artwork in DIDL responses) and ports
+forward the most useful playback fixes from the closed-source
+[UPnP 2025 fork](https://getmusicbee.com/addons/plugins/534/upnp-2025/).
 
 UPnP/DLNA is a network protocol that lets devices on your local network share and play media without any cloud or login. This plugin gives MusicBee three roles, each switched on independently on the **General** tab:
 
@@ -32,7 +94,59 @@ You can use any combination of the three. The settings dialog only shows the tab
 
 ---
 
-## 2. Words that come up a lot
+## Features
+
+These don't exist in the original plugin or in UPnP 2025. They make the UPnP browsing experience much better when you have a big library.
+
+### Filter tabs become UPnP root containers
+
+If you have MusicBee filter tabs configured (the things across the top of MusicBee's main view — `MAIN`, `ALL`, `FAV`, `AI`, `REC`, etc.), they appear as **top-level entries** in your UPnP client.
+
+This means a 300,000-track library doesn't dump you into a single overwhelming "Music" node. You get focused entry points — Jazz, Classical, Rock, Podcasts, Favorites, whatever filters you've set up — alongside the standard Music / Audiobooks / Radio / Playlists entries.
+
+The filters are read live from `%AppData%\MusicBee\Filters\*.xautopf` — exactly the files MusicBee itself uses, so they stay in sync without configuration.
+
+### The whole library is published, not just "Music"
+
+Podcasts, Audiobooks, Radio stations, the Inbox and Playlists each appear as their own browsable container alongside the music — and each can be shown, hidden or pinned to the root individually (the **View** tab). Podcast subscriptions open to their episodes, with subscription artwork carried through. Most servers expose a flat music library and nothing else.
+
+### Every node gets its own shape
+
+Tapping a filter root drops you into **Album Artist → Album → Tracks** by default — with correct Disc/Track ordering inside each album, not alphabetical or random. But that shape is a *choice*: each node carries its own discovery path (see the **Paths** tab), so a playlist can browse as a flat ordered list, a filter by Genre or Year, and podcasts by subscription.
+
+### Artists sorted by `Sort Album Artist`, not by display name
+
+If your tags follow the convention `Artist = "Bob Dylan"`, `Sort Album Artist = "Dylan, Bob"`, the UPnP tree groups Dylan under **D**, not under **B**. The Sort field is used for both grouping and alphabetical display.
+
+If a track has multiple Album Artists (e.g. `yaiol; Ars Ricercata`), it appears under **each** of them — same convention as multi-genre tracks.
+
+### Album thumbnails in the UPnP tree
+
+Album-container DIDL responses now include `upnp:albumArtURI`, so renderers that show artwork in their browse views actually do. The original plugin only included artwork on individual tracks.
+
+### Coexists with the original plugin
+
+The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicBee UPnP (yaiol)**, so it can live side-by-side with the original `mb_Upnp.dll` on disk. **Don't run both at once** — they bind the same UPnP port and same device UUID. Enable one in MusicBee's plugin manager, disable the other.
+
+---
+
+## Documentation
+
+| | |
+|---|---|
+| **User manual** | [Read it online](https://apps.yaiol.com/en/p/musicbee-upnp-plugin/help/) |
+| **Printable PDF** | attached to each [release](../../releases/latest) |
+| **What's new** | [Release notes](https://apps.yaiol.com/en/p/musicbee-upnp-plugin/help/releases/) |
+| **Product page** | [apps.yaiol.com](https://apps.yaiol.com/en/p/musicbee-upnp-plugin/) |
+
+The section below is the settings reference — what every option in the plugin's own dialog does.
+
+---
+
+## Settings reference
+
+<details>
+<summary><b>Words that come up a lot</b></summary>
 
 | Word | What it actually means |
 |---|---|
@@ -46,9 +160,7 @@ You can use any combination of the three. The settings dialog only shows the tab
 | **DIDL / DIDL-Lite** | The XML format UPnP uses to describe tracks, albums, artists. |
 | **DLNA flags** | Bits in the HTTP response telling the renderer what kind of stream it's getting (live vs file, seekable vs not, etc.). |
 
----
-
-## 3. The settings dialog — section by section
+</details>
 
 ### General
 
@@ -172,43 +284,7 @@ Defaults are sensible (new filters group by album artist; playlists and the Inbo
 
 ---
 
-## 4. yaiol-fork-only features
-
-These don't exist in the original plugin or in UPnP 2025. They make the UPnP browsing experience much better when you have a big library.
-
-### Filter tabs become UPnP root containers
-
-If you have MusicBee filter tabs configured (the things across the top of MusicBee's main view — `MAIN`, `ALL`, `FAV`, `AI`, `REC`, etc.), they appear as **top-level entries** in your UPnP client.
-
-This means a 300,000-track library doesn't dump you into a single overwhelming "Music" node. You get focused entry points — Jazz, Classical, Rock, Podcasts, Favorites, whatever filters you've set up — alongside the standard Music / Audiobooks / Radio / Playlists entries.
-
-The filters are read live from `%AppData%\MusicBee\Filters\*.xautopf` — exactly the files MusicBee itself uses, so they stay in sync without configuration.
-
-### The whole library is published, not just "Music"
-
-Podcasts, Audiobooks, Radio stations, the Inbox and Playlists each appear as their own browsable container alongside the music — and each can be shown, hidden or pinned to the root individually (the **View** tab). Podcast subscriptions open to their episodes, with subscription artwork carried through. Most servers expose a flat music library and nothing else.
-
-### Every node gets its own shape
-
-Tapping a filter root drops you into **Album Artist → Album → Tracks** by default — with correct Disc/Track ordering inside each album, not alphabetical or random. But that shape is a *choice*: each node carries its own discovery path (see the **Paths** tab), so a playlist can browse as a flat ordered list, a filter by Genre or Year, and podcasts by subscription.
-
-### Artists sorted by `Sort Album Artist`, not by display name
-
-If your tags follow the convention `Artist = "Bob Dylan"`, `Sort Album Artist = "Dylan, Bob"`, the UPnP tree groups Dylan under **D**, not under **B**. The Sort field is used for both grouping and alphabetical display.
-
-If a track has multiple Album Artists (e.g. `yaiol; Ars Ricercata`), it appears under **each** of them — same convention as multi-genre tracks.
-
-### Album thumbnails in the UPnP tree
-
-Album-container DIDL responses now include `upnp:albumArtURI`, so renderers that show artwork in their browse views actually do. The original plugin only included artwork on individual tracks.
-
-### Coexists with the original plugin
-
-The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicBee UPnP (yaiol)**, so it can live side-by-side with the original `mb_Upnp.dll` on disk. **Don't run both at once** — they bind the same UPnP port and same device UUID. Enable one in MusicBee's plugin manager, disable the other.
-
----
-
-## 5. Quick troubleshooting
+## Troubleshooting
 
 | Symptom | First thing to try |
 |---|---|
@@ -222,7 +298,7 @@ The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicB
 
 ---
 
-## 6. What this fork doesn't do
+## Limitations
 
 Honestly, things you should know up front:
 
@@ -231,7 +307,19 @@ Honestly, things you should know up front:
 
 ---
 
-## 7. Architecture
+## Build from source
+
+Requires Visual Studio 2019+ (Community is fine) and the .NET Framework 4.7.2 targeting pack. The COM-interop `Interop.UPNPLib.dll` is **committed to the repo** (under `bin/`), so a fresh clone builds with no extra setup. If you ever need to regenerate it, run `TlbImp.exe C:\Windows\System32\upnp.dll /out:bin\Interop.UPNPLib.dll /namespace:UPNPLib` from a Developer Command Prompt.
+
+```
+main/MusicBeeUpnp.sln
+```
+
+Build configuration: `Debug | x86` for local work → `main/bin/Debug/mb_UPnP_yaiol.dll`. Published releases are built `Release | x86` by CI: pushing a `v*` tag runs `.github/workflows/release.yml`, which builds on a Windows runner and creates the GitHub release with the DLL attached and the matching `CHANGELOG.md` section as the notes.
+
+---
+
+## Architecture
 
 A single VB.NET assembly — `mb_UPnP_yaiol.dll`, targeting **.NET Framework 4.7.2** (x86) — loaded in-process by MusicBee. No external services, no NuGet runtime dependencies; the only non-framework reference is the COM-interop `Interop.UPNPLib.dll`, a thin shim generated from Windows' built-in `upnp.dll` (the "UPnP 1.0 Type Library") and used only for router port-forwarding. Because that COM library is part of Windows, nothing beyond the single DLL ships to users.
 
@@ -265,30 +353,11 @@ The assembly is deliberately named `mb_UPnP_yaiol.dll` and announces itself as *
 
 ---
 
-## 8. Installation
-
-1. Download `mb_UPnP_yaiol.dll` from the [latest release](https://github.com/yaiol/musicbee-upnp-plugin/releases/latest).
-2. Copy it into your MusicBee plugins folder, typically:
-   `C:\Users\<you>\AppData\Roaming\MusicBee\Plugins\`
-3. Restart MusicBee.
-4. **Edit → Preferences → Plugins** → find **MusicBee UPnP (yaiol)** → click **Configure**.
-5. If the original `mb_Upnp.dll` is also enabled, disable it.
-
----
-
-## 9. Building from source
-
-Requires Visual Studio 2019+ (Community is fine) and the .NET Framework 4.7.2 targeting pack. The COM-interop `Interop.UPNPLib.dll` is **committed to the repo** (under `bin/`), so a fresh clone builds with no extra setup. If you ever need to regenerate it, run `TlbImp.exe C:\Windows\System32\upnp.dll /out:bin\Interop.UPNPLib.dll /namespace:UPNPLib` from a Developer Command Prompt.
-
-```
-main/MusicBeeUpnp.sln
-```
-
-Build configuration: `Debug | x86` for local work → `main/bin/Debug/mb_UPnP_yaiol.dll`. Published releases are built `Release | x86` by CI: pushing a `v*` tag runs `.github/workflows/release.yml`, which builds on a Windows runner and creates the GitHub release with the DLL attached and the matching `CHANGELOG.md` section as the notes.
-
----
-
-## 10. Credits
+## Credits
 
 - Original plugin by **Steven Mayall**. This fork rewrote the library browsing and the settings dialog and added the renderer, but the UPnP, HTTP and SSDP core it all stands on is still largely his code.
 - The UPnP 2025 fork by **BoringName** for ideas and bug catalogs.
+
+<div align="center">
+  <sub>MusicBee UPnP Plugin is part of <a href="https://apps.yaiol.com">yaiol Applications</a>.</sub>
+</div>
