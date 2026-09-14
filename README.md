@@ -19,7 +19,7 @@
 </div>
 
 <h3 align="center">
-  <a href="https://apps.yaiol.com/en/p/musicbee-upnp-plugin/">Website</a>
+  <a href="https://apps.yaiol.com/p/musicbee-upnp-plugin/">Website</a>
   <span>&nbsp;·&nbsp;</span>
   <a href="#install">Install</a>
   <span>&nbsp;·&nbsp;</span>
@@ -33,7 +33,7 @@
 </h3>
 
 <div align="center">
-  <sub><a href="https://apps.yaiol.com/en/p/musicbee-upnp-plugin/help/"><b>Help in 22 languages</b></a></sub>
+  <sub><a href="https://apps.yaiol.com/p/musicbee-upnp-plugin/help/"><b>Help in 22 languages</b></a></sub>
 </div>
 
 <!-- /readme:nav -->
@@ -134,10 +134,10 @@ The DLL is named `mb_UPnP_yaiol.dll` and the plugin announces itself as **MusicB
 
 | | |
 |---|---|
-| **User manual** | [Read it online](https://apps.yaiol.com/en/p/musicbee-upnp-plugin/help/) |
+| **User manual** | [Read it online](https://apps.yaiol.com/p/musicbee-upnp-plugin/help/) |
 | **Printable PDF** | attached to each [release](../../releases/latest) |
-| **What's new** | [Release notes](https://apps.yaiol.com/en/p/musicbee-upnp-plugin/help/releases/) |
-| **Product page** | [apps.yaiol.com](https://apps.yaiol.com/en/p/musicbee-upnp-plugin/) |
+| **What's new** | [Release notes](https://apps.yaiol.com/p/musicbee-upnp-plugin/help/releases/) |
+| **Product page** | [apps.yaiol.com](https://apps.yaiol.com/p/musicbee-upnp-plugin/) |
 
 The section below is the settings reference — what every option in the plugin's own dialog does.
 
