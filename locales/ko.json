@@ -129,6 +129,16 @@
   "chkLibViwVisible": "표시",
   "chkLibViwTopLevel": "최상위",
   "lblLibPthAlbumGroup": "앨범 그룹 기준:",
+  "lblLibOptRandomSource": "임의 재생 출처:",
   "cboLibOptRandomSourceAll": "모든 음악",
-  "lblLibOptRandomSource": "임의 재생 출처:"
+  "EncTestBuiltin": "{0}: 항상 사용 가능 (플러그인 자체에서 인코딩됨)",
+  "EncTestOk": "{0}: 작동 중",
+  "EncTestNoConverter": "{0}: MusicBee에 이 형식의 파일 변환기가 없습니다",
+  "EncTestExeMissing": "{0}: 인코더가 설치되지 않았습니다 - {1}",
+  "EncTestNoOutput": "{0}: 인코더가 실행되었지만 아무것도 생성하지 못했습니다 - {1}",
+  "EncTestFailed": "{0}: 인코더를 테스트할 수 없었습니다 - {1}",
+  "EncTestAllOk": "모든 출력 형식이 작동 중입니다.",
+  "EncTestHint": "위에서 작동하지 않는 것으로 나열된 형식은 장치에서 무음으로 재생됩니다. MusicBee의 '환경설정 > 파일 변환기'에서 수정하세요. 각 형식에는 인코더 위치와 명령줄 매개변수가 있습니다 (초기화 버튼은 MusicBee의 기본값을 복원합니다).",
+  "EncTestCrashed": "{0}: 인코더가 충돌했습니다 ({1}) - 명령줄 매개변수가 잘못되었을 수 있습니다",
+  "btnDbgTestEncoders": "인코더 테스트"
 }

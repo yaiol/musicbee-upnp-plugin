@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Sichtbar",
   "chkLibViwTopLevel": "Oberste Ebene",
   "lblLibPthAlbumGroup": "Alben gruppieren nach:",
+  "lblLibOptRandomSource": "Zufällige Wiedergabe von:",
   "cboLibOptRandomSourceAll": "Alle Musik",
-  "lblLibOptRandomSource": "Zufällige Wiedergabe von:"
+  "EncTestBuiltin": "{0}: immer verfügbar (vom Plugin selbst kodiert)",
+  "EncTestOk": "{0}: funktioniert",
+  "EncTestNoConverter": "{0}: MusicBee hat keinen Dateikonverter für dieses Format",
+  "EncTestExeMissing": "{0}: Encoder nicht installiert - {1}",
+  "EncTestNoOutput": "{0}: der Encoder lief, produzierte aber nichts - {1}",
+  "EncTestFailed": "{0}: konnte den Encoder nicht testen - {1}",
+  "EncTestAllOk": "Alle Ausgabeformate funktionieren.",
+  "EncTestHint": "Ein oben als nicht funktionierend aufgeführtes Format wird auf Ihrem Gerät als Stille wiedergegeben. Beheben Sie dies in MusicBee: Einstellungen > Dateikonverter, wo jedes Format seinen Encoder-Speicherort und seine Befehlszeilenparameter hat (die Schaltfläche „Zurücksetzen“ stellt die Standardeinstellungen von MusicBee wieder her).",
+  "EncTestCrashed": "{0}: Der Encoder ist abgestürzt ({1}) - seine Kommandozeilenparameter sind wahrscheinlich falsch",
+  "btnDbgTestEncoders": "Encoder testen"
 }

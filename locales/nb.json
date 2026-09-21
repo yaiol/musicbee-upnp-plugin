@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Synlig",
   "chkLibViwTopLevel": "Toppnivå",
   "lblLibPthAlbumGroup": "Grupper album etter:",
+  "lblLibOptRandomSource": "Tilfeldig avspilling fra:",
   "cboLibOptRandomSourceAll": "All musikk",
-  "lblLibOptRandomSource": "Tilfeldig avspilling fra:"
+  "EncTestBuiltin": "{0}: alltid tilgjengelig (kodet av selve programtillegget)",
+  "EncTestOk": "{0}: fungerer",
+  "EncTestNoConverter": "{0}: MusicBee har ingen filkonverterer for dette formatet",
+  "EncTestExeMissing": "{0}: koder ikke installert - {1}",
+  "EncTestNoOutput": "{0}: koderen kjørte, men produserte ingenting - {1}",
+  "EncTestFailed": "{0}: kunne ikke teste koderen - {1}",
+  "EncTestAllOk": "Alle utdataformater fungerer.",
+  "EncTestHint": "Et format som er oppført som ikke fungerende ovenfor, vil spilles av som stillhet på enheten din. Fiks det i MusicBee: Innstillinger > Filkonverterere, hvor hvert format har sin koderplassering og sine kommandolinjeparametere (Tilbakestill-knappen gjenoppretter MusicBees egne standardinnstillinger).",
+  "EncTestCrashed": "{0}: koderen krasjet ({1}) - kommandolinjeparameterne er sannsynligvis feil",
+  "btnDbgTestEncoders": "Test kodere"
 }

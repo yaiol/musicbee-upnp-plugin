@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Synlig",
   "chkLibViwTopLevel": "Översta nivån",
   "lblLibPthAlbumGroup": "Gruppera album efter:",
+  "lblLibOptRandomSource": "Slumpmässig uppspelning från:",
   "cboLibOptRandomSourceAll": "All musik",
-  "lblLibOptRandomSource": "Slumpmässig uppspelning från:"
+  "EncTestBuiltin": "{0}: alltid tillgängligt (kodas av insticksprogrammet självt)",
+  "EncTestOk": "{0}: fungerar",
+  "EncTestNoConverter": "{0}: MusicBee har ingen filkonverterare för detta format",
+  "EncTestExeMissing": "{0}: kodare inte installerad - {1}",
+  "EncTestNoOutput": "{0}: kodaren kördes men producerade inget - {1}",
+  "EncTestFailed": "{0}: kunde inte testa kodaren - {1}",
+  "EncTestAllOk": "Alla utdataformat fungerar.",
+  "EncTestHint": "Ett format som listas ovan som inte fungerar kommer att spelas som tystnad på din enhet. Åtgärda det i MusicBee: Inställningar > Filkonverterare, där varje format har sin kodarplats och sina kommandoradsparametrar (knappen Återställ återställer MusicBees egna standardinställningar).",
+  "EncTestCrashed": "{0}: kodaren kraschade ({1}) - dess kommandoradsparametrar är förmodligen felaktiga",
+  "btnDbgTestEncoders": "Testa kodare"
 }

@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Widoczne",
   "chkLibViwTopLevel": "Najwyższy poziom",
   "lblLibPthAlbumGroup": "Grupuj albumy według:",
+  "lblLibOptRandomSource": "Losowe odtwarzanie z:",
   "cboLibOptRandomSourceAll": "Cała muzyka",
-  "lblLibOptRandomSource": "Losowe odtwarzanie z:"
+  "EncTestBuiltin": "{0}: zawsze dostępne (kodowane przez samą wtyczkę)",
+  "EncTestOk": "{0}: działa",
+  "EncTestNoConverter": "{0}: MusicBee nie ma konwertera plików dla tego formatu",
+  "EncTestExeMissing": "{0}: koder nie jest zainstalowany - {1}",
+  "EncTestNoOutput": "{0}: koder działał, ale nic nie wyprodukował - {1}",
+  "EncTestFailed": "{0}: nie udało się przetestować kodera - {1}",
+  "EncTestAllOk": "Wszystkie formaty wyjściowe działają.",
+  "EncTestHint": "Format wymieniony powyżej jako niedziałający zostanie odtworzony jako cisza na Twoim urządzeniu. Napraw to w MusicBee: Preferencje > Konwertery plików, gdzie każdy format ma swoją lokalizację kodera i parametry wiersza poleceń (przycisk Reset przywraca domyślne ustawienia MusicBee).",
+  "EncTestCrashed": "{0}: koder uległ awarii ({1}) - jego parametry wiersza poleceń są prawdopodobnie błędne",
+  "btnDbgTestEncoders": "Testuj kodery"
 }

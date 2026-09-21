@@ -1,4 +1,4 @@
-Imports System.Drawing
+﻿Imports System.Drawing
 Imports System.Threading
 Imports System.Xml.Linq
 
@@ -118,7 +118,6 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.chkPbkForceNativeStreamForRadio.Checked = Plugin.Settings.ForceNativeStreamForRadio
         Me.chkDbgInfo.Checked = Plugin.Settings.LogDebugInfo
         Me.chkDbgClearLogOnStartup.Checked = Plugin.Settings.ClearLogOnStartup
-        Me.btnDbgView.Left = Me.chkDbgInfo.Right + 5
         Try
             LoadViewsTab()
             CrashTrace("ctor: LoadViewsTab OK")
@@ -249,6 +248,32 @@ Partial Friend NotInheritable Class SettingsDialog
             Me.chkDevForceTranscoding.Checked = False
             AddHandler Me.chkDevForceTranscoding.CheckedChanged, AddressOf chkDevForceTranscoding_CheckedChanged
         End If
+    End Sub
+
+    ' Runs every offered output format through its real encoder and reports what actually
+    ' happened. This exists because the failure it detects is otherwise invisible: an encoder that
+    ' cannot run still returns a valid, EMPTY HTTP 200 to the renderer, which then shows its own
+    ' vague error. MusicBee's own file converter says "check the encoding command line parameters"
+    ' in that situation; until this button, the plugin said nothing at all.
+    Private Sub btnDbgTestEncoders_Click(sender As Object, e As EventArgs)
+        Dim previousCursor As Cursor = Me.Cursor
+        Me.Cursor = Cursors.WaitCursor
+        Me.btnDbgTestEncoders.Enabled = False
+        Dim report As New System.Text.StringBuilder()
+        Dim problems As Integer = 0
+        Try
+            For Each result As Plugin.EncoderCheck.Result In Plugin.EncoderCheck.CheckAll()
+                report.AppendLine(Plugin.EncoderCheck.Describe(result))
+                If Not result.IsUsable Then problems += 1
+            Next result
+        Finally
+            Me.btnDbgTestEncoders.Enabled = True
+            Me.Cursor = previousCursor
+        End Try
+        report.AppendLine()
+        report.Append(If(problems = 0, Plugin.L("EncTestAllOk"), Plugin.L("EncTestHint")))
+        MessageBox.Show(Me, report.ToString(), Plugin.L("MessageBoxTitle"), MessageBoxButtons.OK,
+                        If(problems = 0, MessageBoxIcon.Information, MessageBoxIcon.Warning))
     End Sub
 
     Private Sub chkDevForceTranscoding_CheckedChanged(sender As Object, e As EventArgs)
@@ -2248,6 +2273,7 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.lblDevTranscodeSampleRate.Text = Plugin.L("lblDevTranscodeSampleRate")
         Me.chkDevForceNativeStream.Text = Plugin.L("chkDevForceNativeStream")
         Me.chkDevForceTranscoding.Text = Plugin.L("chkDevForceTranscoding")
+        Me.btnDbgTestEncoders.Text = Plugin.L("btnDbgTestEncoders")
         Me.chkDevEnableSoundEffects.Text = Plugin.L("chkDevEnableSoundEffects")
         Me.chkDevEnableReplayGain.Text = Plugin.L("chkDevEnableReplayGain")
         Me.chkDevEnableNextUri.Text = Plugin.L("chkDevEnableNextUri")
@@ -2312,6 +2338,7 @@ Partial Friend NotInheritable Class SettingsDialog
         AddHandler Me.tbcLibraryPaths.SelectedIndexChanged, AddressOf tbcLibraryPaths_SelectedIndexChanged
         AddHandler Me.chkDevForceNativeStream.CheckedChanged, AddressOf chkDevForceNativeStream_CheckedChanged
         AddHandler Me.chkDevForceTranscoding.CheckedChanged, AddressOf chkDevForceTranscoding_CheckedChanged
+        AddHandler Me.btnDbgTestEncoders.Click, AddressOf btnDbgTestEncoders_Click
         AddHandler Me.btnLibOptHierAdd.Click, AddressOf libOptHierAdd_Click
         AddHandler Me.btnLibOptHierRemove.Click, AddressOf libOptHierRemove_Click
         AddHandler Me.lstLibOptHierFields.SelectedIndexChanged, AddressOf libOptHierList_SelectionChanged

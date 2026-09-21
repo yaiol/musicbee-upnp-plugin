@@ -129,6 +129,16 @@
   "chkLibViwVisible": "表示",
   "chkLibViwTopLevel": "トップレベル",
   "lblLibPthAlbumGroup": "アルバムをグループ化:",
+  "lblLibOptRandomSource": "ランダム再生元:",
   "cboLibOptRandomSourceAll": "すべての音楽",
-  "lblLibOptRandomSource": "ランダム再生元:"
+  "EncTestBuiltin": "{0}: 常に利用可能 (プラグイン自体によってエンコードされます)",
+  "EncTestOk": "{0}: 動作中",
+  "EncTestNoConverter": "{0}: MusicBee にはこの形式のファイルコンバーターがありません",
+  "EncTestExeMissing": "{0}: エンコーダーがインストールされていません - {1}",
+  "EncTestNoOutput": "{0}: エンコーダーは実行されましたが、何も出力されませんでした - {1}",
+  "EncTestFailed": "{0}: エンコーダーをテストできませんでした - {1}",
+  "EncTestAllOk": "すべての出力形式が動作しています。",
+  "EncTestHint": "上記で動作しないと表示されている形式は、デバイスで無音として再生されます。MusicBee の「環境設定 > ファイルコンバーター」で修正してください。各形式にはエンコーダーの場所とコマンドラインパラメーターがあります（「リセット」ボタンは MusicBee のデフォルト設定に戻します）。",
+  "EncTestCrashed": "{0}: エンコーダーがクラッシュしました ({1}) - コマンドラインパラメータが間違っている可能性があります",
+  "btnDbgTestEncoders": "エンコーダーをテスト"
 }

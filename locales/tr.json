@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Görünür",
   "chkLibViwTopLevel": "Üst düzey",
   "lblLibPthAlbumGroup": "Albümü şuna göre grupla:",
+  "lblLibOptRandomSource": "Rastgele çalma kaynağı:",
   "cboLibOptRandomSourceAll": "Tüm Müzikler",
-  "lblLibOptRandomSource": "Rastgele çalma kaynağı:"
+  "EncTestBuiltin": "{0}: her zaman kullanılabilir (eklenti tarafından kodlanır)",
+  "EncTestOk": "{0}: çalışıyor",
+  "EncTestNoConverter": "{0}: MusicBee'de bu biçim için dosya dönüştürücü yok",
+  "EncTestExeMissing": "{0}: kodlayıcı yüklü değil - {1}",
+  "EncTestNoOutput": "{0}: kodlayıcı çalıştı ancak hiçbir şey üretmedi - {1}",
+  "EncTestFailed": "{0}: kodlayıcı test edilemedi - {1}",
+  "EncTestAllOk": "Tüm çıkış biçimleri çalışıyor.",
+  "EncTestHint": "Yukarıda çalışmıyor olarak listelenen bir biçim, cihazınızda sessizlik olarak çalacaktır. Bunu MusicBee'de düzeltin: Tercihler > Dosya Dönüştürücüler, burada her biçimin kodlayıcı konumu ve komut satırı parametreleri bulunur (Sıfırla düğmesi MusicBee'nin kendi varsayılanlarını geri yükler).",
+  "EncTestCrashed": "{0}: kodlayıcı çöktü ({1}) - komut satırı parametreleri muhtemelen yanlış",
+  "btnDbgTestEncoders": "Kodlayıcıları Test Et"
 }

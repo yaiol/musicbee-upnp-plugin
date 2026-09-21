@@ -38,6 +38,7 @@ Partial Public Class Plugin
         Public Sub Dispose()
             [Stop]()
             playStatisticsTimer.Dispose()
+            EncodedCache.Clear()
         End Sub
 
         Public ReadOnly Property HttpServer() As HttpServer
@@ -119,6 +120,15 @@ Partial Public Class Plugin
                     remoteAddress = DirectCast(request.Socket.Client.RemoteEndPoint, IPEndPoint).Address.ToString()
                 End If
                 LogInformation("GetFile[" & counter & "] " & localAddress, request.Method & " " & url & " to " & remoteAddress)
+                ' Same request dump as the encoded path, so the two can be compared directly: what a
+                ' client asks for when it is happy (native) against what it asks for when it falls
+                ' back to a generic decoder (transcoded), at the same position in a queue.
+                Dim askedNative As New StringBuilder()
+                For Each header As KeyValuePair(Of String, String) In request.Headers
+                    If askedNative.Length > 0 Then askedNative.Append(" | ")
+                    askedNative.Append(header.Key).Append("="c).Append(header.Value)
+                Next header
+                LogInformation("GetFile[" & counter & "].Request", askedNative.ToString())
             End If
             Using stream As New IO.FileStream(url, IO.FileMode.Open, IO.FileAccess.Read, IO.FileShare.Read, 65536, IO.FileOptions.SequentialScan)
                 Dim fileLength As Long = stream.Length
@@ -242,6 +252,10 @@ Partial Public Class Plugin
                     encoder = New AudioEncoder(FileCodec.Aac)
                 Case "audio/x-ogg", "audio/ogg"
                     encoder = New AudioEncoder(FileCodec.Ogg)
+                Case "audio/flac", "audio/x-flac"
+                    ' F9 - without this the FLAC transcode URL fell through to the Else branch and
+                    ' the server sent raw L16 PCM bytes under an audio/flac content type.
+                    encoder = New AudioEncoder(FileCodec.Flac)
                 Case "audio/x-ms-wma", "audio/wma", "audio/x-wma"
                     encoder = New AudioEncoder(FileCodec.Wma)
                 Case "audio/wav", "audio/x-wav"
@@ -331,6 +345,37 @@ Partial Public Class Plugin
                 streamHandle = encoder.GetEncodeStreamHandle(sourceStreamHande, sampleRate, channelCount, bitDepth, (musicBeePlayToMode AndAlso Not isContinuousStream))
                 Dim counter As Integer = Interlocked.Increment(requestCounter)
                 Dim logId As String = "GetEncodedFile[" & counter & "]"
+                ' Dump what the client actually asked for. The non-PCM branch below never reads the
+                ' `range` header at all - it answers 200 with the whole stream - so a client that
+                ' requests one gets no Content-Range and no clue it was ignored, and nothing about
+                ' that reaches the log. This line is how we find out whether a queued track asks for
+                ' something the first track of a session does not.
+                If Settings.LogDebugInfo Then
+                    Dim asked As New StringBuilder()
+                    For Each header As KeyValuePair(Of String, String) In request.Headers
+                        If asked.Length > 0 Then asked.Append(" | ")
+                        asked.Append(header.Key).Append("="c).Append(header.Value)
+                    Next header
+                    LogInformation(logId & ".Request", asked.ToString())
+                End If
+                ' Encode to a file first, then serve the file, for every format produced by an
+                ' external encoder. Two things this buys that piping cannot:
+                '   - a real Content-Length and working byte ranges, so a client will hand the
+                '     stream to its own native decoder instead of refusing it or falling back to a
+                '     generic one (measured: the PCM path, which does send a length, is accepted by
+                '     Android's stagefright; the piped FLAC path is not);
+                '   - formats whose container cannot be written to a pipe at all, because it has to
+                '     seek back to finish its header once the length is known (MP4/AAC).
+                ' PCM and Wave are deliberately excluded: BASS encodes those in-process, they
+                ' already carry a correct Content-Length, and they work. Nothing here changes them.
+                ' Only for a stream with a known duration - a radio stream has no end to wait for.
+                If Not isContinuousStream AndAlso fileDuration > 0 AndAlso Not isPcmData _
+                    AndAlso RequiresEncodedFile(encoder.Codec) Then
+                    ServeFromEncodedFile(request, response, encoder, streamHandle, sourceStreamHande,
+                                         url, id, duration, fileDuration, bitDepth, sampleRate,
+                                         channelCount, streamingProfile, directory, targetMime, logId)
+                    Return
+                End If
                 If fileDuration <= 0 Then 'duration.Ticks <= 0 Then
                     response.AddHeader("transferMode.dlna.org", "Streaming")
                     response.AddHeader("contentFeatures.dlna.org", directory.GetContinuousStreamFeature(encoder.Codec))
@@ -344,13 +389,25 @@ Partial Public Class Plugin
                         End If
                     End If
                 Else
-                    If isPcmData Then
-                        Dim decodedLength As Long = Bass.GetDecodedLength(streamHandle, fileDuration)
-                        If bitDepth <> 24 Then
-                            fileEncodeLength = decodedLength \ 2
-                        Else
-                            fileEncodeLength = (decodedLength * 3) \ 4
-                        End If
+                    ' How many bytes BASS will hand the encoder. For PCM/Wave this doubles as the
+                    ' response Content-Length, which is why it used to be computed for those only.
+                    ' A command-line encoder needs it too: BASS writes this length into the WAV
+                    ' header it pipes to the encoder's stdin, and leaving it 0 makes BASS stamp a
+                    ' placeholder there - flac.exe copied that placeholder into STREAMINFO, so every
+                    ' transcoded FLAC declared ~3h22 and could not be seeked by duration.
+                    ' Only for a known duration; a live/radio stream keeps 0 and the placeholder,
+                    ' which is correct for something with no end.
+                    ' Ask the decoder how long the stream really is rather than trusting the tag:
+                    ' MusicBee's duration is rounded to the millisecond, and since this value is a
+                    ' hard stop for the encoder, deriving it from the tag chopped the last ~44
+                    ' samples off every track - inaudible alone, but it breaks gapless and makes the
+                    ' encoded FLAC's STREAMINFO disagree with the source by the same amount.
+                    Dim exactDuration As Double = Bass.GetDecodedDuration(sourceStreamHande)
+                    Dim decodedLength As Long = Bass.GetDecodedLength(streamHandle, If(exactDuration > 0, exactDuration, fileDuration))
+                    If bitDepth <> 24 Then
+                        fileEncodeLength = decodedLength \ 2
+                    Else
+                        fileEncodeLength = (decodedLength * 3) \ 4
                     End If
                     response.AddHeader("X-AvailableSeekRange", String.Format(System.Globalization.CultureInfo.InvariantCulture, "1 npt=0.0-{0:0.000}", duration.TotalSeconds))
                     Dim npt As String
@@ -398,6 +455,18 @@ Partial Public Class Plugin
                     ElseIf Not isPcmData OrElse fileEncodeLength <= 0 Then
                         response.AddHeader(HttpHeader.AcceptRanges, "none")
                         response.AddHeader("contentFeatures.dlna.org", directory.GetEncodeFeature(encoder.Codec, (fileDuration <= 0)))
+                        ' F7 - the profile's Content-Length policy never reached this branch, so a
+                        ' transcoded stream always went out with no length header at all - which is
+                        ' precisely the case the Fixed placeholder exists for, and some clients
+                        ' refuse their native decoder for a stream they cannot measure. Only Fixed
+                        ' applies here: the encoded size is unknowable until the encode finishes, so
+                        ' there is nothing honest to send for the other modes.
+                        If streamingProfile.ContentLength = ContentLengthMode.Fixed Then
+                            Dim fixedLenStr As String = FormatContentLength(streamingProfile, isPcmData, 0)
+                            If fixedLenStr IsNot Nothing Then
+                                response.AddHeader(HttpHeader.ContentLength, fixedLenStr)
+                            End If
+                        End If
                     Else
                         response.AddHeader(HttpHeader.AcceptRanges, "bytes")
                         response.AddHeader("contentFeatures.dlna.org", directory.GetEncodeFeature(encoder.Codec, False))
@@ -426,6 +495,13 @@ Partial Public Class Plugin
                             isPartialContent = (byteRangeStart > 0)
                             contentLength = byteRangeEnd - byteRangeStart + 1
                             fileEncodeLength = contentLength
+                            If encoder.Codec = FileCodec.Wave AndAlso Not isPartialContent Then
+                                ' fileEncodeLength is the PCM budget handed to the encoder; the 44-byte
+                                ' RIFF header it writes sits on top of it. A `bytes=0-` request still
+                                ' gets the header, so the budget has to exclude those 44 bytes or we
+                                ' send 44 more than the Content-Range we just promised.
+                                fileEncodeLength -= 44
+                            End If
                             If encoder.Codec = FileCodec.Wave AndAlso byteRangeStart > 0 Then
                                 byteRangeStart -= 44
                             End If
@@ -685,6 +761,142 @@ Partial Public Class Plugin
                 End If
             End Using
             resourceManager.ReleaseAllResources()
+        End Sub
+
+        ''' <summary>
+        ''' The formats that have a demonstrated reason to be encoded to a file first. Deliberately
+        ''' NOT every externally-encoded format:
+        '''   - Aac  - its MP4 container cannot be written to a pipe at all (it seeks back to
+        '''            finalise the header), so piping produces a zero-byte stream. Measured.
+        '''   - Flac - pipes fine, but with no Content-Length a client will not give it to its own
+        '''            decoder: BubbleUPnP falls back to ffmpeg, and a renderer with no fallback may
+        '''            refuse it outright. Measured against the PCM path, which does send a length
+        '''            and IS accepted natively.
+        ''' Mp3 and Ogg stream correctly today with no reported problem, and PCM/Wave are encoded
+        ''' in-process with a length that is plain arithmetic. None of them are touched. The same
+        ''' argument as FLAC's could be made for Mp3 and Ogg, but it is an argument, not evidence -
+        ''' add them when something actually fails, not before.
+        ''' </summary>
+        Private Shared Function RequiresEncodedFile(codec As FileCodec) As Boolean
+            Select Case codec
+                Case FileCodec.Aac, FileCodec.Flac
+                    Return True
+                Case Else
+                    Return False
+            End Select
+        End Function
+
+        ''' <summary>
+        ''' Encode the whole track to a temporary file, then serve that file like any other: real
+        ''' Content-Length, real byte ranges, real seeking.
+        '''
+        ''' The cost is that the first byte leaves only once encoding finishes - measured at roughly
+        ''' half a second for a four-minute track, since the encoders run far faster than realtime.
+        ''' What it buys is that the response stops being an unmeasurable stream, which is what makes
+        ''' clients refuse it or fall back to a generic decoder.
+        ''' </summary>
+        Private Shared Sub ServeFromEncodedFile(request As HttpRequest, response As HttpResponse,
+                                                encoder As AudioEncoder, streamHandle As Integer,
+                                                sourceStreamHandle As Integer, url As String, id As String,
+                                                duration As TimeSpan, fileDuration As Double,
+                                                bitDepth As Integer, sampleRate As Integer,
+                                                channelCount As Integer, streamingProfile As StreamingProfile,
+                                                directory As ItemManager, targetMime As String, logId As String)
+            ' Same PCM budget the streaming path computes: the decoder's own length rather than
+            ' the tag duration, which is rounded to the millisecond and would clip the tail.
+            Dim exactDuration As Double = Bass.GetDecodedDuration(sourceStreamHandle)
+            Dim decodedLength As Long = Bass.GetDecodedLength(streamHandle, If(exactDuration > 0, exactDuration, fileDuration))
+            Dim encodeBudget As Long = If(bitDepth <> 24, decodedLength \ 2, (decodedLength * 3) \ 4)
+
+            ' Everything that can change the bytes goes in the key. The command line is in there
+            ' because it is user-editable in MusicBee's preferences: edit the quality and the
+            ' cached file must stop being a match rather than quietly outlive the change.
+            Dim keyQuality As EncodeQuality
+            Dim keyCommandLine As String = AudioEncoder.GetConvertCommandLine(encoder.Codec, keyQuality, logId)
+            Dim cacheKey As String = String.Join("|", id, encoder.Codec.ToString(), sampleRate.ToString(),
+                                                 channelCount.ToString(), bitDepth.ToString(),
+                                                 If(keyCommandLine, ""))
+
+            Dim encodedPath As String = EncodedCache.GetOrCreate(cacheKey, logId,
+                Sub(target As String)
+                    Dim startTicks As Long = DateTime.UtcNow.Ticks
+                    encoder.StartEncode(url, streamHandle, False, encodeBudget, bitDepth,
+                                        request.Socket.Client.Handle, logId, streamingProfile.ForceLittleEndianPcm,
+                                        target)
+                    Dim encodeMs As Long = (DateTime.UtcNow.Ticks - startTicks) \ TimeSpan.TicksPerMillisecond
+                    Dim written As Long = If(IO.File.Exists(target), New IO.FileInfo(target).Length, 0L)
+                    LogInformation(logId, "encoded to file: " & written & " bytes in " & encodeMs & " ms")
+                End Sub)
+
+            If encodedPath Is Nothing Then
+                ' The encoder produced nothing. Saying so is the whole point of this branch
+                ' existing - the old behaviour was a valid, empty 200 that told the user nothing.
+                LogError(New InvalidOperationException("encoder produced no file"), logId,
+                         "codec=" & encoder.Codec.ToString())
+                Throw New HttpException(500, "Encoder produced no output")
+            End If
+
+            ' FileShare.Delete matters: it lets the cache evict this file while we are still sending
+            ' it. Windows drops the name immediately and frees the data when the last handle closes,
+            ' so an eviction can never interrupt a response in flight.
+            Using stream As New IO.FileStream(encodedPath, IO.FileMode.Open, IO.FileAccess.Read,
+                                              IO.FileShare.Read Or IO.FileShare.Delete,
+                                              65536, IO.FileOptions.SequentialScan)
+                Dim encodedLength As Long = stream.Length
+                Dim sendLength As Long = encodedLength
+                    Dim byteRange As String = Nothing
+                    If request.Headers.TryGetValue("range", byteRange) Then
+                        Dim values() As String = byteRange.Split("="c).Last().Split("-"c).[Select](Function(a) a.Trim()).ToArray()
+                        Dim rangeStart As Long
+                        If Not Long.TryParse(values(0), rangeStart) Then
+                            rangeStart = 0
+                        ElseIf rangeStart < 0 Then
+                            rangeStart += encodedLength
+                        End If
+                        Dim rangeEnd As Long
+                        If values.Length < 2 OrElse Not Long.TryParse(values(1), rangeEnd) Then
+                            rangeEnd = encodedLength - 1
+                        End If
+                        If rangeEnd >= encodedLength Then rangeEnd = encodedLength - 1
+                        If rangeStart < 0 Then rangeStart = 0
+                        If rangeStart <= rangeEnd Then
+                            response.StateCode = 206
+                            response.AddHeader("Content-Range", String.Format("bytes {0}-{1}/{2}", rangeStart, rangeEnd, encodedLength))
+                            sendLength = rangeEnd - rangeStart + 1
+                            stream.Position = rangeStart
+                            If Settings.LogDebugInfo Then
+                                LogInformation(logId, "range=" & String.Format("bytes {0}-{1}/{2}", rangeStart, rangeEnd, encodedLength))
+                            End If
+                        End If
+                    End If
+
+                    response.AddHeader("X-AvailableSeekRange", String.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                                                            "1 npt=0.0-{0:0.000}", duration.TotalSeconds))
+                    response.AddHeader(HttpHeader.ContentType, targetMime)
+                    response.AddHeader(HttpHeader.AcceptRanges, "bytes")
+                    response.AddHeader("transferMode.dlna.org", "Streaming")
+                    ' Seeking is genuinely available now, so stop advertising otherwise.
+                    response.AddHeader("contentFeatures.dlna.org", directory.GetEncodeFeature(encoder.Codec, False))
+                    response.AddHeader(HttpHeader.ContentLength, sendLength.ToString())
+                    response.SendHeaders()
+
+                    If String.Compare(request.Method, "GET", StringComparison.OrdinalIgnoreCase) = 0 Then
+                        Dim errorCode As Integer
+                        Dim sendTicks As Long
+                        WaitOnSendBarrier(logId)
+                        Try
+                            sendTicks = DateTime.UtcNow.Ticks
+                            errorCode = Sockets_Stream_File(stream.SafeFileHandle.DangerousGetHandle,
+                                                            CUInt(sendLength), request.Socket.Client.Handle)
+                        Finally
+                            ReleaseSendBarrier()
+                        End Try
+                        If Settings.LogDebugInfo Then
+                            LogInformation(logId, "sent " & sendLength & " bytes, exit=" & errorCode &
+                                           ", playtime=" & ((DateTime.UtcNow.Ticks - sendTicks) \ TimeSpan.TicksPerMillisecond))
+                        End If
+                    End If
+            End Using
         End Sub
 
         <DllImport("MusicBeeBass.dll", CallingConvention:=CallingConvention.Cdecl)> _

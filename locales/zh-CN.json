@@ -129,6 +129,16 @@
   "chkLibViwVisible": "可见",
   "chkLibViwTopLevel": "顶层",
   "lblLibPthAlbumGroup": "专辑分组方式：",
+  "lblLibOptRandomSource": "随机播放来源：",
   "cboLibOptRandomSourceAll": "所有音乐",
-  "lblLibOptRandomSource": "随机播放来源："
+  "EncTestBuiltin": "{0}: 始终可用 (由插件自身编码)",
+  "EncTestOk": "{0}: 正常工作",
+  "EncTestNoConverter": "{0}: MusicBee 没有此格式的文件转换器",
+  "EncTestExeMissing": "{0}: 编码器未安装 - {1}",
+  "EncTestNoOutput": "{0}: 编码器已运行但未生成任何内容 - {1}",
+  "EncTestFailed": "{0}: 无法测试编码器 - {1}",
+  "EncTestAllOk": "所有输出格式均正常工作。",
+  "EncTestHint": "上面列出的不工作格式将在您的设备上播放为静音。请在 MusicBee 中修复它：偏好设置 > 文件转换器，其中每种格式都有其编码器位置和命令行参数（重置按钮将恢复 MusicBee 自己的默认设置）。",
+  "EncTestCrashed": "{0}: 编码器崩溃 ({1}) - 其命令行参数可能不正确",
+  "btnDbgTestEncoders": "测试编码器"
 }

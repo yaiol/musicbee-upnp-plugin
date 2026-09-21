@@ -129,6 +129,16 @@
   "chkLibViwVisible": "可見",
   "chkLibViwTopLevel": "最上層",
   "lblLibPthAlbumGroup": "專輯分組方式：",
+  "lblLibOptRandomSource": "隨機播放來源：",
   "cboLibOptRandomSourceAll": "所有音樂",
-  "lblLibOptRandomSource": "隨機播放來源："
+  "EncTestBuiltin": "{0}: 始終可用 (由外掛程式自身編碼)",
+  "EncTestOk": "{0}: 正常運作",
+  "EncTestNoConverter": "{0}: MusicBee 沒有此格式的檔案轉換器",
+  "EncTestExeMissing": "{0}: 編碼器未安裝 - {1}",
+  "EncTestNoOutput": "{0}: 編碼器已執行但未產生任何內容 - {1}",
+  "EncTestFailed": "{0}: 無法測試編碼器 - {1}",
+  "EncTestAllOk": "所有輸出格式均正常運作。",
+  "EncTestHint": "上面列出的不工作格式將在您的裝置上播放為靜音。請在 MusicBee 中修復它：偏好設定 > 檔案轉換器，其中每種格式都有其編碼器位置和命令列參數（重設按鈕將恢復 MusicBee 自己的預設設定）。",
+  "EncTestCrashed": "{0}: 編碼器崩潰 ({1}) - 其命令列參數可能不正確",
+  "btnDbgTestEncoders": "測試編碼器"
 }

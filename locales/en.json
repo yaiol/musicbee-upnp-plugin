@@ -131,5 +131,15 @@
   "chkLibViwTopLevel": "Top level",
   "lblLibPthAlbumGroup": "Group album by:",
   "lblLibOptRandomSource": "Random plays from:",
-  "cboLibOptRandomSourceAll": "All Music"
+  "cboLibOptRandomSourceAll": "All Music",
+  "EncTestBuiltin": "{0}: always available (encoded by the plugin itself)",
+  "EncTestOk": "{0}: working",
+  "EncTestNoConverter": "{0}: MusicBee has no file converter for this format",
+  "EncTestExeMissing": "{0}: encoder not installed - {1}",
+  "EncTestNoOutput": "{0}: the encoder ran but produced nothing - {1}",
+  "EncTestFailed": "{0}: could not test the encoder - {1}",
+  "EncTestAllOk": "All output formats are working.",
+  "EncTestHint": "A format listed above as not working will play as silence on your device. Fix it in MusicBee: Preferences > File Converters, where each format has its encoder location and its command line parameters (the Reset button restores MusicBee's own defaults).",
+  "EncTestCrashed": "{0}: the encoder crashed ({1}) - its command line parameters are probably wrong",
+  "btnDbgTestEncoders": "Test Encoders"
 }

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.0 — 2026-09-21
+
+- FLAC as a transcoding output format now works; selecting it previously produced no playable stream at all
+- AAC as a transcoding output format now works, by encoding to a temporary file instead of a pipe
+- Fixed a click at the start of every track when streaming PCM to a device that follows the DLNA profile strictly
+- Transcoded tracks are no longer cut a millisecond short, which also restores clean gapless transitions
+- Transcoded FLAC and AAC are now sent with a known length and support seeking, so players use their own decoder instead of falling back to a generic one
+- A track is now encoded once per play instead of up to four times
+- New Test Encoders button under Settings, Debug: runs each output format through its real encoder and reports which ones work on your machine
+- The Content length setting in a device profile now applies to transcoded streams as well
+- A byte-range request for a complete WAV stream no longer sends 44 bytes more than it announced
+- Rewrote the README and added project images
+
 ## 2.0.9 — 2026-08-23
 
 - The What's new and Download links in the update notice open in MusicBee's own language

@@ -56,7 +56,14 @@ Partial Public Class Plugin
             Return streamHandle
         End Function
 
-        Public Sub StartEncode(url As String, streamHandle As Integer, isPartialContent As Boolean, fileEncodeLength As Long, encodeBitDepth As Integer, targetSocketHandle As IntPtr, logId As String, Optional forceLittleEndian As Boolean = False)
+        ''' <param name="outputFilePath">
+        ''' Normally Nothing: [outputfile] becomes "-" and the encoder's output is piped straight to
+        ''' the socket as it is produced. Give a path instead and the encoder writes there, nothing
+        ''' comes back on the socket, and the caller serves the finished file afterwards - which is
+        ''' the only way to handle a container that cannot be written to a pipe (MP4 must seek back
+        ''' to finalise its header), and the only way to know the encoded size in advance.
+        ''' </param>
+        Public Sub StartEncode(url As String, streamHandle As Integer, isPartialContent As Boolean, fileEncodeLength As Long, encodeBitDepth As Integer, targetSocketHandle As IntPtr, logId As String, Optional forceLittleEndian As Boolean = False, Optional outputFilePath As String = Nothing)
             Try
                 Dim is16BitOutput As Boolean = (encodeBitDepth <> 24 OrElse (Codec <> FileCodec.Pcm AndAlso Codec <> FileCodec.Wave))
                 Dim flags As BASSEncode
@@ -78,8 +85,30 @@ Partial Public Class Plugin
                         ' F9 - FLAC added as a transcode output. Same path as MP3/AAC/Ogg: get the
                         ' command-line from MusicBee's standard convert settings, feed it BASS_ENCODE_FP_16BIT
                         ' samples, pipe output to stdout. FLAC mime/DLNA wiring already in place from F26.
+                        '
+                        ' The executable this runs is MusicBee's, from its own <MusicBee>\Codec\ folder -
+                        ' we neither ship nor pick it, we run whatever command line MusicBee hands back.
+                        ' So a format works here only if MusicBee has a working encoder for it, and any
+                        ' encoder MusicBee gains we inherit for free. See CLAUDE.md, "Transcoding runs
+                        ' MusicBee's encoder binaries, not ours", before changing anything in this branch.
                         flags = BASSEncode.BASS_ENCODE_FP_16BIT
-                        encoderCommandLine = mbApiInterface.Setting_GetFileConvertCommandLine(Codec, EncodeQuality.HighQuality).Replace("[outputfile]", "-")
+                        Dim usedQuality As EncodeQuality
+                        Dim convertCommandLine As String = GetConvertCommandLine(Codec, usedQuality, logId)
+                        If String.IsNullOrEmpty(convertCommandLine) Then
+                            ' No converter MusicBee will admit to for this format. Without this the empty
+                            ' command line reached BASS and the renderer got a stalled, empty stream with
+                            ' no clue why - say so in the log instead.
+                            LogError(New InvalidOperationException("MusicBee has no file converter for this format"), logId, "codec=" & Codec.ToString())
+                            Return
+                        End If
+                        If Settings.LogDebugInfo Then
+                            LogInformation(logId, "encoder codec=" & Codec.ToString() & " quality=" & usedQuality.ToString() & " cmd=" & convertCommandLine)
+                        End If
+                        If String.IsNullOrEmpty(outputFilePath) Then
+                            encoderCommandLine = convertCommandLine.Replace("[outputfile]", "-")
+                        Else
+                            encoderCommandLine = convertCommandLine.Replace("[outputfile]", ChrW(34) & outputFilePath & ChrW(34))
+                        End If
                 End Select
                 Dim startTime As Long
                 Dim playTime As Long
@@ -101,6 +130,40 @@ Partial Public Class Plugin
                 Bass.CloseStream(streamHandle)
             End Try
         End Sub
+
+        ''' <summary>
+        ''' The one place that answers "what command line does MusicBee use for this codec".
+        ''' Both the streaming path and the settings-dialog encoder test go through here, so a
+        ''' test can never pass against a command line the real path would not have used.
+        ''' Returns Nothing when MusicBee has no converter it will admit to.
+        ''' </summary>
+        Friend Shared Function GetConvertCommandLine(codec As FileCodec, ByRef usedQuality As EncodeQuality, logId As String) As String
+            ' MusicBee's convert settings are keyed by (codec, quality) and not every pair exists.
+            ' Asking for Flac at HighQuality throws inside MusicBee - Flac is the only lossless codec
+            ' on this path, and lossless presets live under the Archiving row of
+            ' Preferences > File Converters. Try the quality that suits the codec first, then the
+            ' other, so a throw or a blank from one lookup doesn't take the caller down with it.
+            Dim qualities() As EncodeQuality
+            If codec = FileCodec.Flac Then
+                qualities = New EncodeQuality() {EncodeQuality.Archiving, EncodeQuality.HighQuality}
+            Else
+                qualities = New EncodeQuality() {EncodeQuality.HighQuality, EncodeQuality.Archiving}
+            End If
+            For Each quality As EncodeQuality In qualities
+                Dim commandLine As String = Nothing
+                Try
+                    commandLine = mbApiInterface.Setting_GetFileConvertCommandLine(codec, quality)
+                Catch ex As Exception
+                    LogError(ex, logId & ".ConvertCommandLine", "codec=" & codec.ToString() & " quality=" & quality.ToString())
+                    commandLine = Nothing
+                End Try
+                If Not String.IsNullOrEmpty(commandLine) Then
+                    usedQuality = quality
+                    Return commandLine
+                End If
+            Next quality
+            Return Nothing
+        End Function
 
         Public Shared Sub StopEncode()
             Sockets_Encoder_Stop()

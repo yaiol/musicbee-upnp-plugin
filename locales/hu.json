@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Látható",
   "chkLibViwTopLevel": "Fő szint",
   "lblLibPthAlbumGroup": "Albumok csoportosítása:",
+  "lblLibOptRandomSource": "Véletlenszerű lejátszás innen:",
   "cboLibOptRandomSourceAll": "Összes zene",
-  "lblLibOptRandomSource": "Véletlenszerű lejátszás innen:"
+  "EncTestBuiltin": "{0}: mindig elérhető (a beépülő modul kódolja)",
+  "EncTestOk": "{0}: működik",
+  "EncTestNoConverter": "{0}: A MusicBee nem rendelkezik fájlkonverterrel ehhez a formátumhoz",
+  "EncTestExeMissing": "{0}: a kódoló nincs telepítve - {1}",
+  "EncTestNoOutput": "{0}: a kódoló futott, de nem produkált semmit - {1}",
+  "EncTestFailed": "{0}: nem sikerült tesztelni a kódolót - {1}",
+  "EncTestAllOk": "Minden kimeneti formátum működik.",
+  "EncTestHint": "A fent nem működőként felsorolt formátum csendként fog lejátszódni az eszközén. Javítsa ki a MusicBee-ben: Beállítások > Fájlkonverterek, ahol minden formátumhoz megadható a kódoló helye és a parancssori paraméterei (a Visszaállítás gomb visszaállítja a MusicBee saját alapértelmezett beállításait).",
+  "EncTestCrashed": "{0}: a kódoló összeomlott ({1}) - a parancssori paraméterei valószínűleg hibásak",
+  "btnDbgTestEncoders": "Kódolók tesztelése"
 }

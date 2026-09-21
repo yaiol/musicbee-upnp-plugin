@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Zichtbaar",
   "chkLibViwTopLevel": "Hoofdniveau",
   "lblLibPthAlbumGroup": "Album groeperen op:",
+  "lblLibOptRandomSource": "Willekeurig afspelen van:",
   "cboLibOptRandomSourceAll": "Alle muziek",
-  "lblLibOptRandomSource": "Willekeurig afspelen van:"
+  "EncTestBuiltin": "{0}: altijd beschikbaar (gecodeerd door de plugin zelf)",
+  "EncTestOk": "{0}: werkt",
+  "EncTestNoConverter": "{0}: MusicBee heeft geen bestandsconverter voor dit formaat",
+  "EncTestExeMissing": "{0}: encoder niet geïnstalleerd - {1}",
+  "EncTestNoOutput": "{0}: de encoder heeft gedraaid maar niets geproduceerd - {1}",
+  "EncTestFailed": "{0}: kon de encoder niet testen - {1}",
+  "EncTestAllOk": "Alle uitvoerformaten werken.",
+  "EncTestHint": "Een hierboven als niet werkend vermeld formaat zal als stilte worden afgespeeld op uw apparaat. Los dit op in MusicBee: Voorkeuren > Bestandsconverters, waar elk formaat zijn encoderlocatie en commandoregelparameters heeft (de Reset-knop herstelt de standaardinstellingen van MusicBee).",
+  "EncTestCrashed": "{0}: de encoder is gecrasht ({1}) - de opdrachtregelparameters zijn waarschijnlijk onjuist",
+  "btnDbgTestEncoders": "Encoders testen"
 }

@@ -76,6 +76,8 @@
     <Compile Include="ConnectionManagerService.vb" />
     <Compile Include="ContentDirectoryService.vb" />
     <Compile Include="Encoder.vb" />
+    <Compile Include="EncoderCheck.vb" />
+    <Compile Include="EncodedCache.vb" />
     <Compile Include="HttpRequest.vb" />
     <Compile Include="HttpResponse.vb" />
     <Compile Include="HttpServer.vb" />

@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Visibile",
   "chkLibViwTopLevel": "Livello superiore",
   "lblLibPthAlbumGroup": "Raggruppa album per:",
+  "lblLibOptRandomSource": "Riproduzione casuale da:",
   "cboLibOptRandomSourceAll": "Tutta la musica",
-  "lblLibOptRandomSource": "Riproduzione casuale da:"
+  "EncTestBuiltin": "{0}: sempre disponibile (codificato dal plugin stesso)",
+  "EncTestOk": "{0}: funzionante",
+  "EncTestNoConverter": "{0}: MusicBee non ha un convertitore di file per questo formato",
+  "EncTestExeMissing": "{0}: encoder non installato - {1}",
+  "EncTestNoOutput": "{0}: l'encoder è stato eseguito ma non ha prodotto nulla - {1}",
+  "EncTestFailed": "{0}: impossibile testare l'encoder - {1}",
+  "EncTestAllOk": "Tutti i formati di output funzionano.",
+  "EncTestHint": "Un formato elencato sopra come non funzionante verrà riprodotto come silenzio sul tuo dispositivo. Correggilo in MusicBee: Preferenze > Convertitori di file, dove ogni formato ha la sua posizione dell'encoder e i suoi parametri della riga di comando (il pulsante Ripristina ripristina le impostazioni predefinite di MusicBee).",
+  "EncTestCrashed": "{0}: il codificatore è andato in crash ({1}) - i suoi parametri della riga di comando sono probabilmente errati",
+  "btnDbgTestEncoders": "Testa codificatori"
 }

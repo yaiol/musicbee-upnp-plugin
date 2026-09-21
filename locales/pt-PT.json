@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Visível",
   "chkLibViwTopLevel": "Nível superior",
   "lblLibPthAlbumGroup": "Agrupar álbum por:",
+  "lblLibOptRandomSource": "Reprodução aleatória de:",
   "cboLibOptRandomSourceAll": "Toda a música",
-  "lblLibOptRandomSource": "Reprodução aleatória de:"
+  "EncTestBuiltin": "{0}: sempre disponível (codificado pelo próprio plugin)",
+  "EncTestOk": "{0}: a funcionar",
+  "EncTestNoConverter": "{0}: MusicBee não tem um conversor de ficheiros para este formato",
+  "EncTestExeMissing": "{0}: codificador não instalado - {1}",
+  "EncTestNoOutput": "{0}: o codificador foi executado, mas não produziu nada - {1}",
+  "EncTestFailed": "{0}: não foi possível testar o codificador - {1}",
+  "EncTestAllOk": "Todos os formatos de saída estão a funcionar.",
+  "EncTestHint": "Um formato listado acima como não funcionando será reproduzido como silêncio no seu dispositivo. Corrija-o no MusicBee: Preferências > Conversores de Ficheiros, onde cada formato tem a localização do seu codificador e os seus parâmetros de linha de comando (o botão Repor restaura as predefinições do MusicBee).",
+  "EncTestCrashed": "{0}: o codificador falhou ({1}) - os seus parâmetros de linha de comandos estão provavelmente errados",
+  "btnDbgTestEncoders": "Testar Codificadores"
 }

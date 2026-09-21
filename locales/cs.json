@@ -129,6 +129,16 @@
   "chkLibViwVisible": "Viditelné",
   "chkLibViwTopLevel": "Nejvyšší úroveň",
   "lblLibPthAlbumGroup": "Seskupit alba podle:",
+  "lblLibOptRandomSource": "Náhodné přehrávání z:",
   "cboLibOptRandomSourceAll": "Veškerá hudba",
-  "lblLibOptRandomSource": "Náhodné přehrávání z:"
+  "EncTestBuiltin": "{0}: vždy dostupné (kódováno samotným pluginem)",
+  "EncTestOk": "{0}: funguje",
+  "EncTestNoConverter": "{0}: MusicBee nemá převodník souborů pro tento formát",
+  "EncTestExeMissing": "{0}: kodér není nainstalován - {1}",
+  "EncTestNoOutput": "{0}: kodér běžel, ale nic nevyprodukoval - {1}",
+  "EncTestFailed": "{0}: nepodařilo se otestovat kodér - {1}",
+  "EncTestAllOk": "Všechny výstupní formáty fungují.",
+  "EncTestHint": "Formát uvedený výše jako nefunkční se na vašem zařízení přehraje jako ticho. Opravte jej v MusicBee: Předvolby > Převodníky souborů, kde má každý formát své umístění kodéru a parametry příkazového řádku (tlačítko Reset obnoví výchozí nastavení MusicBee).",
+  "EncTestCrashed": "{0}: kodér selhal ({1}) - jeho parametry příkazového řádku jsou pravděpodobně špatné",
+  "btnDbgTestEncoders": "Testovat kodéry"
 }

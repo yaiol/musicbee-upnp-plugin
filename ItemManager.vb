@@ -5376,8 +5376,12 @@ Partial Public Class Plugin
                 Case FileCodec.Pcm
                     Return "DLNA.ORG_PN=LPCM;"
                 Case FileCodec.Wave
-                    ' F25 - Wave (PCM-in-RIFF) is conventionally tagged as LPCM by DLNA servers.
-                    Return "DLNA.ORG_PN=LPCM;"
+                    ' DLNA defines PN=LPCM against audio/L16: headerless samples starting at byte 0.
+                    ' Wave is audio/wav with a 44-byte RIFF header, so claiming LPCM told renderers
+                    ' to play that header as audio - measured at full scale, against a track whose
+                    ' real opening samples are near silence. DLNA has no PN for RIFF/WAV audio and
+                    ' the field is optional, so declare none rather than a false one.
+                    Return String.Empty
                 Case FileCodec.Flac
                     ' F26 - Non-standard but widely supported by hi-fi renderers.
                     Return "DLNA.ORG_PN=FLAC;"
@@ -5862,7 +5866,12 @@ startRemovePrefix:
             Public ReadOnly Audio As MediaSettings
 
             Public Sub New()
-                Audio = New MediaSettings(New AudioEncoder(FileCodec.Pcm), New AudioEncoder(FileCodec.Wave), New AudioEncoder(FileCodec.Mp3), New AudioEncoder(FileCodec.Aac), New AudioEncoder(FileCodec.Ogg))
+                ' F9 - Flac belongs in this list. The res-writing loop in WriteAudioFileDIDL only
+                ' emits a transcoded <res> for a codec that appears here, so leaving Flac out made
+                ' "transcode to FLAC" produce an item with NO playable resource at all: the native
+                ' <res> is suppressed (forceEncode is True) and no encoded <res> replaces it, so
+                ' SetAVTransportURI is sent an empty URI and the renderer answers 716 Resource not found.
+                Audio = New MediaSettings(New AudioEncoder(FileCodec.Pcm), New AudioEncoder(FileCodec.Wave), New AudioEncoder(FileCodec.Mp3), New AudioEncoder(FileCodec.Aac), New AudioEncoder(FileCodec.Ogg), New AudioEncoder(FileCodec.Flac))
             End Sub
 
             Public Class MediaSettings
