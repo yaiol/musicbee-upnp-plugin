@@ -298,6 +298,35 @@ Defaults are sensible (new filters group by album artist; playlists and the Inbo
 
 ---
 
+## MusicBee's encoders
+
+Every transcoded format except PCM/WAV is produced by an encoder program from MusicBee's `Codec` folder — the same programs MusicBee's own File Converter uses. The plugin doesn't ship or choose them; if a format fails in MusicBee, it fails here too. **Debug → Test Encoders** runs each one and reports what happened.
+
+### Most of the bundled encoders are out of date
+
+| Encoder | MusicBee ships | Current | Download |
+|---|---|---|---|
+| flac.exe | 1.3.2 (x32) | 1.5.0 (x64) | <https://github.com/xiph/flac/releases> — or <https://www.rarewares.org/lossless.php> |
+| lame.exe | 3.100 (x32) | 4.0 (x64) | <https://lame.sourceforge.io/download.php> |
+| mpcenc.exe | 1.30.0 (x32) | 1.30.0 (x64) — current | <https://www.musepack.net/index.php?pg=win> |
+| oggenc2.exe | 2.88 (x32) | 2.88 (x64) — current | <https://www.rarewares.org/ogg-oggenc.php> |
+| opusenc.exe | 0.1.10 (x32) | 0.2.30 (x32) | <https://opus-codec.org/downloads/> |
+| Takc.exe | 2.3.0 (x32) | 2.3.3 (x32) | <https://encode.su/threads/3612-TAK-2-3-1-Final> |
+| wavpack.exe | 5.1.0 (x32) | 5.9.0 (x32) | <https://www.wavpack.com/downloads.html> |
+| neroAacEnc.exe | not included | 1.5.4.0 (x32) | <https://www.videohelp.com/software/Nero-AAC-Codec> |
+
+For the lossless formats (FLAC, WavPack, TAK) the age doesn't affect quality: a lossless file decodes to exactly the same audio whichever encoder version made it — newer versions are mainly faster and compress slightly better. For lossy formats, a newer encoder may give better quality at the same bitrate. AAC needs `neroAacEnc.exe`, which MusicBee doesn't include at all.
+
+To update them, put newer builds in MusicBee's `Codec` folder under the same file names, after backing up the originals. The official FLAC 1.5 build also needs its `libFLAC.dll` and `libFLAC++.dll` copied next to `flac.exe`.
+
+### Ogg conversion may be silently broken on an older installation
+
+The Ogg encoder's saved parameters can contain an option (`-p 4`) that neither the `oggenc2` bundled with MusicBee nor the current release accepts, so every Ogg conversion fails with *"No output file was produced"* — without the parameters ever having been edited. MusicBee's current defaults don't include that option, so it looks like an old default that upgrades never replaced: an existing installation keeps its saved parameters even after MusicBee itself has been fixed.
+
+To check: **Preferences → File Converters → OGG**. If the parameters contain `-p 4`, click **Reset**, then **Save**. They should then read like `-q 5 - -o [outputfile]`.
+
+---
+
 ## Limitations
 
 Honestly, things you should know up front:
