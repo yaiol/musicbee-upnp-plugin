@@ -29,6 +29,8 @@
   <span>&nbsp;·&nbsp;</span>
   <a href="#settings-reference">Settings reference</a>
   <span>&nbsp;·&nbsp;</span>
+  <a href="#musicbees-encoders">MusicBee's encoders</a>
+  <span>&nbsp;·&nbsp;</span>
   <a href="#build-from-source">Development</a>
 </h3>
 
