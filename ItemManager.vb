@@ -1184,7 +1184,7 @@ Partial Public Class Plugin
         Private Shared Sub LoadLibraryFilters()
             filterFolderNodes = New List(Of FolderNode)
             filterTemplateNodes = New List(Of TemplateNode)
-            Dim filtersDir As String = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MusicBee", "Filters")
+            Dim filtersDir As String = LazyFiltersDir()
             If Not Directory.Exists(filtersDir) Then
                 Return
             End If
@@ -2971,7 +2971,9 @@ Partial Public Class Plugin
                         For Each v As String In allVals
                             usedLetters.Add(LazyBucketChar(v, lvl.Field))
                         Next
-                        If usedLetters.Count <> 1 Then Exit Do
+                        ' Stations with no value for this field are listed at this level (see
+                        ' LazyRadioUnfiled): skipping the level would hide them.
+                        If usedLetters.Count <> 1 OrElse LazyRadioUnfiled(endpoint, filters, lvl.Field).Count > 0 Then Exit Do
                         Dim letterList As New List(Of Char)(usedLetters)
                         Dim onlyLetter As String = letterList(0).ToString()
                         filters.Add(New LazyFilter With {.Field = "_L_" & lvl.Field, .Value = onlyLetter})
@@ -2989,6 +2991,7 @@ Partial Public Class Plugin
                             vals = filtered
                         End If
                         If vals.Count <> 1 Then Exit Do
+                        If activeLetter.Length = 0 AndAlso LazyRadioUnfiled(endpoint, filters, lvl.Field).Count > 0 Then Exit Do
                         filters.Add(New LazyFilter With {.Field = lvl.Field, .Value = vals(0)})
                         objectId = objectId & ":" & lvl.Field & "=" & Uri.EscapeDataString(vals(0))
                         depth += 1
@@ -3060,10 +3063,15 @@ Partial Public Class Plugin
                     For Each c As Char In letterList
                         items.Add(LazyEmittable.Container(c.ToString(), "object.container", ":_L_" & currentLevel.Field & "=" & Uri.EscapeDataString(c.ToString())))
                     Next
-                    total = items.Count
+                    Dim unfiled As List(Of String()) = LazyRadioUnfiled(endpoint, filters, currentLevel.Field)
+                    total = items.Count + unfiled.Count
                     Dim endingIndex As Integer = Math.Min(startingIndex + requestedCount - 1, total - 1)
                     For i As Integer = startingIndex To endingIndex
-                        EmitLazyItem(writer, objectId, items(i), hostUrl, filterSet)
+                        If i < items.Count Then
+                            EmitLazyItem(writer, objectId, items(i), hostUrl, filterSet)
+                        Else
+                            WriteAudioFileDIDL(writer, hostUrl, filterSet, objectId, unfiled(i - items.Count), "object.item.audioItem.musicTrack")
+                        End If
                         emitted += 1
                     Next
                 Case LazyLevelKind.ValueDistinct
@@ -3088,10 +3096,17 @@ Partial Public Class Plugin
                     For Each v As String In values
                         items.Add(LazyEmittable.Container(v, containerClass, ":" & nextField & "=" & Uri.EscapeDataString(v)))
                     Next
-                    total = items.Count
+                    ' Under a chosen letter the level lists that letter's values only; the stations
+                    ' with no value were already listed beside the letters.
+                    Dim unfiled As List(Of String()) = If(activeLetter.Length = 0, LazyRadioUnfiled(endpoint, filters, nextField), New List(Of String()))
+                    total = items.Count + unfiled.Count
                     Dim endingIndex As Integer = Math.Min(startingIndex + requestedCount - 1, total - 1)
                     For i As Integer = startingIndex To endingIndex
-                        EmitLazyItem(writer, objectId, items(i), hostUrl, filterSet)
+                        If i < items.Count Then
+                            EmitLazyItem(writer, objectId, items(i), hostUrl, filterSet)
+                        Else
+                            WriteAudioFileDIDL(writer, hostUrl, filterSet, objectId, unfiled(i - items.Count), "object.item.audioItem.musicTrack")
+                        End If
                         emitted += 1
                     Next
                 Case LazyLevelKind.AlbumLayer
@@ -3292,6 +3307,20 @@ Partial Public Class Plugin
         ' suffix, or an album container with artwork. Pulls the three emit cases out
         ' of the LazyBrowse switch so each level can choose what to emit by appending
         ' to a single list (e.g. prepending an [All Tracks] entry for IncludeAllTracks).
+        ' The radio stations that have NO value for a level's field, narrowed to the filters chosen
+        ' so far. A station's folder is optional in MusicBee (a station with none sits under "All
+        ' Stations" only), and the Radio view groups by that folder: a level made of the distinct
+        ' folder names alone left every unfiled station unreachable, and a library whose stations
+        ' have no folder at all showed an EMPTY Radio container (reported 2026-11). So the level
+        ' lists them itself, after its folders. Radio only: for the library the same level shows
+        ' values and nothing else, as MusicBee's own views do.
+        Private Function LazyRadioUnfiled(endpoint As String, filters As List(Of LazyFilter), field As String) As List(Of String())
+            If Not String.Equals(endpoint, "radio", StringComparison.OrdinalIgnoreCase) Then Return New List(Of String())
+            Dim narrowed As New List(Of LazyFilter)(filters)
+            narrowed.Add(New LazyFilter With {.Field = field, .Value = ""})
+            Return GetLazyTracksForFilterIn(endpoint, narrowed)
+        End Function
+
         Private NotInheritable Class LazyEmittable
             Public Kind As Integer                ' 0=AllTracks, 1=Container, 2=AlbumContainer
             Public Title As String
@@ -3715,10 +3744,27 @@ Partial Public Class Plugin
             Return names
         End Function
 
-        Private Shared Function LazyFiltersDir() As String
-            Return IO.Path.Combine( _
+        ' Where MusicBee keeps its library filters (.xautopf): the "Filters" folder of ITS OWN data
+        ' folder, which MusicBee reports. That is %AppData%\MusicBee on a standard install, but
+        ' not on a portable one (the data sits beside the program), where a fixed %AppData% path
+        ' found no filter at all: the Filters container was empty and its group in the settings
+        ' tree had no children (reported 2026-11). The fixed path stays as a fallback for a
+        ' layout that keeps the filters there while the data folder is elsewhere.
+        ' The ONE answer to "where are the filters": every caller goes through here.
+        Friend Shared Function LazyFiltersDir() As String
+            Dim legacy As String = IO.Path.Combine( _
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _
                 "MusicBee", "Filters")
+            Try
+                Dim storage As String = mbApiInterface.Setting_GetPersistentStoragePath()
+                If Not String.IsNullOrEmpty(storage) Then
+                    Dim own As String = IO.Path.Combine(storage, "Filters")
+                    If IO.Directory.Exists(own) OrElse Not IO.Directory.Exists(legacy) Then Return own
+                End If
+            Catch ex As Exception
+                LogError(ex, "LazyFiltersDir")
+            End Try
+            Return legacy
         End Function
 
         ' Extract the user's .xautopf conditions in a form ready to inline into our

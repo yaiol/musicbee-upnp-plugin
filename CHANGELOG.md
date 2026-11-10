@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 — 2026-11-11
+
+- Radio stations that have no folder in MusicBee now appear in the Radio container; they were left out, so a library whose stations had no folder showed an empty Radio
+- Library filters are now read from MusicBee's own data folder instead of a fixed location
+- Updated the README
+
 ## 2.1.0 — 2026-09-21
 
 - FLAC as a transcoding output format now works; selecting it previously produced no playable stream at all

@@ -1507,9 +1507,7 @@ Public Class Plugin
             ' order-independent.
             list.Add(New EndpointInfo("music", Plugin.L("SectionMusic"), EndpointType.Music))
             Try
-                Dim filtersDir As String = IO.Path.Combine( _
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _
-                    "MusicBee", "Filters")
+                Dim filtersDir As String = ItemManager.LazyFiltersDir()
                 If IO.Directory.Exists(filtersDir) Then
                     Dim files() As String = IO.Directory.GetFiles(filtersDir, "*.xautopf")
                     Array.Sort(files, StringComparer.CurrentCultureIgnoreCase)
