@@ -140,5 +140,18 @@
   "EncTestAllOk": "Alle utdataformater fungerer.",
   "EncTestHint": "Et format som er oppført som ikke fungerende ovenfor, vil spilles av som stillhet på enheten din. Fiks det i MusicBee: Innstillinger > Filkonverterere, hvor hvert format har sin koderplassering og sine kommandolinjeparametere (Tilbakestill-knappen gjenoppretter MusicBees egne standardinnstillinger).",
   "EncTestCrashed": "{0}: koderen krasjet ({1}) - kommandolinjeparameterne er sannsynligvis feil",
-  "btnDbgTestEncoders": "Test kodere"
+  "btnDbgTestEncoders": "Test kodere",
+  "tabEncoders": "Koderer",
+  "lblEncIntro": "Koderprogrammene MusicBee bruker for å konvertere et spor, og versjonen av hver:",
+  "colEncFormat": "Format",
+  "colEncProgram": "Program",
+  "colEncVersion": "Versjon",
+  "colEncBuild": "Bygg",
+  "EncReading": "Leser versjonene…",
+  "EncNotInstalled": "ikke installert",
+  "EncVersionUnknown": "ukjent",
+  "EncOpenPage": "Åpne side",
+  "colEncCurrent": "Gjeldende",
+  "colEncDownload": "Last ned",
+  "btnEncOpenFolder": "Åpne kodekmappe"
 }

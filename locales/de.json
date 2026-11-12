@@ -140,5 +140,18 @@
   "EncTestAllOk": "Alle Ausgabeformate funktionieren.",
   "EncTestHint": "Ein oben als nicht funktionierend aufgeführtes Format wird auf Ihrem Gerät als Stille wiedergegeben. Beheben Sie dies in MusicBee: Einstellungen > Dateikonverter, wo jedes Format seinen Encoder-Speicherort und seine Befehlszeilenparameter hat (die Schaltfläche „Zurücksetzen“ stellt die Standardeinstellungen von MusicBee wieder her).",
   "EncTestCrashed": "{0}: Der Encoder ist abgestürzt ({1}) - seine Kommandozeilenparameter sind wahrscheinlich falsch",
-  "btnDbgTestEncoders": "Encoder testen"
+  "btnDbgTestEncoders": "Encoder testen",
+  "tabEncoders": "Encoder",
+  "lblEncIntro": "Die Encoder-Programme, die MusicBee zur Konvertierung eines Titels verwendet, und die Version jedes einzelnen:",
+  "colEncFormat": "Format",
+  "colEncProgram": "Programm",
+  "colEncVersion": "Version",
+  "colEncBuild": "Build",
+  "EncReading": "Versionen werden gelesen…",
+  "EncNotInstalled": "nicht installiert",
+  "EncVersionUnknown": "unbekannt",
+  "EncOpenPage": "Seite öffnen",
+  "colEncCurrent": "Aktuell",
+  "colEncDownload": "Herunterladen",
+  "btnEncOpenFolder": "Encoder-Ordner öffnen"
 }

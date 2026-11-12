@@ -140,5 +140,18 @@
   "EncTestAllOk": "Všechny výstupní formáty fungují.",
   "EncTestHint": "Formát uvedený výše jako nefunkční se na vašem zařízení přehraje jako ticho. Opravte jej v MusicBee: Předvolby > Převodníky souborů, kde má každý formát své umístění kodéru a parametry příkazového řádku (tlačítko Reset obnoví výchozí nastavení MusicBee).",
   "EncTestCrashed": "{0}: kodér selhal ({1}) - jeho parametry příkazového řádku jsou pravděpodobně špatné",
-  "btnDbgTestEncoders": "Testovat kodéry"
+  "btnDbgTestEncoders": "Testovat kodéry",
+  "tabEncoders": "Kodéry",
+  "lblEncIntro": "Programy kodérů, které MusicBee používá k převodu skladeb, a verze každého z nich:",
+  "colEncFormat": "Formát",
+  "colEncProgram": "Program",
+  "colEncVersion": "Verze",
+  "colEncBuild": "Sestavení",
+  "EncReading": "Načítání verzí…",
+  "EncNotInstalled": "není nainstalováno",
+  "EncVersionUnknown": "neznámé",
+  "EncOpenPage": "Otevřít stránku",
+  "colEncCurrent": "Aktuální",
+  "colEncDownload": "Stáhnout",
+  "btnEncOpenFolder": "Otevřít složku kodérů"
 }

@@ -141,5 +141,18 @@
   "EncTestAllOk": "All output formats are working.",
   "EncTestHint": "A format listed above as not working will play as silence on your device. Fix it in MusicBee: Preferences > File Converters, where each format has its encoder location and its command line parameters (the Reset button restores MusicBee's own defaults).",
   "EncTestCrashed": "{0}: the encoder crashed ({1}) - its command line parameters are probably wrong",
-  "btnDbgTestEncoders": "Test Encoders"
+  "btnDbgTestEncoders": "Test Encoders",
+  "tabEncoders": "Encoders",
+  "lblEncIntro": "The encoder programs MusicBee uses to convert a track, and the version of each:",
+  "colEncFormat": "Format",
+  "colEncProgram": "Program",
+  "colEncVersion": "Version",
+  "colEncBuild": "Build",
+  "EncReading": "Reading the versions…",
+  "EncNotInstalled": "not installed",
+  "EncVersionUnknown": "unknown",
+  "EncOpenPage": "Open page",
+  "colEncCurrent": "Current",
+  "colEncDownload": "Download",
+  "btnEncOpenFolder": "Open encoders folder"
 }

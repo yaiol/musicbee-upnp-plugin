@@ -312,7 +312,7 @@ Every transcoded format except PCM/WAV is produced by an encoder program from Mu
 | lame.exe | 3.100 (x32) | 4.0 (x64) | <https://lame.sourceforge.io/download.php> |
 | mpcenc.exe | 1.30.0 (x32) | 1.30.0 (x64) — current | <https://www.musepack.net/index.php?pg=win> |
 | oggenc2.exe | 2.88 (x32) | 2.88 (x64) — current | <https://www.rarewares.org/ogg-oggenc.php> |
-| opusenc.exe | 0.1.10 (x32) | 0.2.30 (x32) | <https://opus-codec.org/downloads/> |
+| opusenc.exe | 0.1.10 (x32) | 0.2 (x32) | <https://opus-codec.org/downloads/> |
 | Takc.exe | 2.3.0 (x32) | 2.3.3 (x32) | <https://encode.su/threads/3612-TAK-2-3-1-Final> |
 | wavpack.exe | 5.1.0 (x32) | 5.9.0 (x32) | <https://www.wavpack.com/downloads.html> |
 | neroAacEnc.exe | not included | 1.5.4.0 (x32) | <https://www.videohelp.com/software/Nero-AAC-Codec> |

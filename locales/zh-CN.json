@@ -140,5 +140,18 @@
   "EncTestAllOk": "所有输出格式均正常工作。",
   "EncTestHint": "上面列出的不工作格式将在您的设备上播放为静音。请在 MusicBee 中修复它：偏好设置 > 文件转换器，其中每种格式都有其编码器位置和命令行参数（重置按钮将恢复 MusicBee 自己的默认设置）。",
   "EncTestCrashed": "{0}: 编码器崩溃 ({1}) - 其命令行参数可能不正确",
-  "btnDbgTestEncoders": "测试编码器"
+  "btnDbgTestEncoders": "测试编码器",
+  "tabEncoders": "编码器",
+  "lblEncIntro": "MusicBee 用于转换音轨的编码器程序及其版本：",
+  "colEncFormat": "格式",
+  "colEncProgram": "程序",
+  "colEncVersion": "版本",
+  "colEncBuild": "构建",
+  "EncReading": "正在读取版本…",
+  "EncNotInstalled": "未安装",
+  "EncVersionUnknown": "未知",
+  "EncOpenPage": "打开页面",
+  "colEncCurrent": "当前",
+  "colEncDownload": "下载",
+  "btnEncOpenFolder": "打开编码器文件夹"
 }

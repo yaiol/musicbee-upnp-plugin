@@ -204,7 +204,7 @@ Partial Friend NotInheritable Class SettingsDialog
     Private Sub UpdateRoleTabs()
         Dim server As Boolean = Me.chkSrvEnableBrowse.Checked
         Dim controlPoint As Boolean = Me.chkEnableController.Checked
-        Dim ordered() As System.Windows.Forms.TabPage = {Me.tabGeneral, Me.tabProfiles, Me.tabPlayback, Me.tabLibraryGeneral, Me.tabLibraryPaths, Me.tabDebug}
+        Dim ordered() As System.Windows.Forms.TabPage = {Me.tabGeneral, Me.tabProfiles, Me.tabPlayback, Me.tabLibraryGeneral, Me.tabLibraryPaths, Me.tabEncoders, Me.tabDebug}
         Dim selected As System.Windows.Forms.TabPage = Me.tbcMain.SelectedTab
         Me.tbcMain.SuspendLayout()
         Me.tbcMain.TabPages.Clear()
@@ -255,6 +255,142 @@ Partial Friend NotInheritable Class SettingsDialog
     ' cannot run still returns a valid, EMPTY HTTP 200 to the renderer, which then shows its own
     ' vague error. MusicBee's own file converter says "check the encoding command line parameters"
     ' in that situation; until this button, the plugin said nothing at all.
+    ' The Encoders tab: MusicBee's encoder programs and the version each one reports. Read the
+    ' first time the tab is shown (it starts each program once, off the UI thread), then kept for
+    ' the life of the dialog: the folder does not change while the settings are open.
+    Private encVersionsLoaded As Boolean = False
+
+    Private Sub tbcMain_EncodersTabShown(sender As Object, e As EventArgs)
+        If Me.tbcMain.SelectedTab IsNot Me.tabEncoders OrElse encVersionsLoaded Then Return
+        encVersionsLoaded = True
+        Me.lvwEncVersions.Items.Clear()
+        Me.lvwEncVersions.Items.Add(New System.Windows.Forms.ListViewItem(Plugin.L("EncReading")))
+        System.Threading.ThreadPool.QueueUserWorkItem(
+            Sub(state As Object)
+                Dim entries As List(Of Plugin.EncoderVersions.Entry) = Nothing
+                Try
+                    entries = Plugin.EncoderVersions.ReadAll()
+                Catch ex As Exception
+                    Plugin.LogError(ex, "EncodersTab.ReadAll")
+                    entries = New List(Of Plugin.EncoderVersions.Entry)
+                End Try
+                Try
+                    If Me.IsDisposed OrElse Not Me.IsHandleCreated Then Return
+                    Me.BeginInvoke(New Action(Sub() ShowEncoderVersions(entries)))
+                Catch ex As Exception
+                    ' The dialog was closed while the programs were being asked: nothing to show.
+                    Return
+                End Try
+                ' What is installed is on screen; now the current versions, which need the network.
+                Dim current As Dictionary(Of String, Plugin.EncoderVersions.Current) = Plugin.EncoderVersions.FetchCurrent()
+                If current.Count = 0 Then Return
+                Try
+                    If Me.IsDisposed OrElse Not Me.IsHandleCreated Then Return
+                    Me.BeginInvoke(New Action(Sub() ShowCurrentEncoderVersions(current)))
+                Catch ex As Exception
+                End Try
+            End Sub)
+    End Sub
+
+    ' Fills the Current column, and marks the rows whose installed program is older than it.
+    Private Sub ShowCurrentEncoderVersions(current As Dictionary(Of String, Plugin.EncoderVersions.Current))
+        If Me.IsDisposed Then Return
+        Me.lvwEncVersions.BeginUpdate()
+        For Each item As System.Windows.Forms.ListViewItem In Me.lvwEncVersions.Items
+            Dim en As Plugin.EncoderVersions.Entry = TryCast(item.Tag, Plugin.EncoderVersions.Entry)
+            Dim c As Plugin.EncoderVersions.Current = Nothing
+            If en Is Nothing OrElse Not current.TryGetValue(en.FileName, c) Then Continue For
+            item.SubItems(EncCurrentColumn).Text = c.Version
+            ' From here each cell carries its own look (a link, a marked version), so a row that is not
+            ' installed gets its grey cell by cell.
+            item.UseItemStyleForSubItems = False
+            If Not en.Present Then
+                For Each cellOfRow As System.Windows.Forms.ListViewItem.ListViewSubItem In item.SubItems
+                    cellOfRow.ForeColor = System.Drawing.SystemColors.GrayText
+                Next cellOfRow
+            End If
+            ' The Download cell opens the project's own download page: drawn as a link, and the cell's Tag holds
+            ' the address the click opens.
+            If c.Download.Length > 0 Then
+                Dim cell As System.Windows.Forms.ListViewItem.ListViewSubItem = item.SubItems(EncDownloadColumn)
+                cell.Text = Plugin.L("EncOpenPage")
+                cell.Tag = c.Download
+                cell.ForeColor = System.Drawing.SystemColors.HotTrack
+                cell.Font = New System.Drawing.Font(Me.lvwEncVersions.Font, System.Drawing.FontStyle.Underline)
+            End If
+            If en.Present AndAlso Plugin.EncoderVersions.IsBehind(en.Version, c.Version) Then
+                item.SubItems(EncCurrentColumn).ForeColor = System.Drawing.Color.Firebrick
+                item.SubItems(EncCurrentColumn).Font = New System.Drawing.Font(Me.lvwEncVersions.Font, System.Drawing.FontStyle.Bold)
+            End If
+        Next item
+        Me.lvwEncVersions.EndUpdate()
+    End Sub
+
+    ' The list's columns: format, program, installed version, current version, download page, build.
+    Private Const EncCurrentColumn As Integer = 3
+    Private Const EncDownloadColumn As Integer = 4
+
+    ' The address behind the Download cell under the pointer, or Nothing anywhere else.
+    Private Function EncDownloadAddressAt(location As System.Drawing.Point) As String
+        Dim hit As System.Windows.Forms.ListViewHitTestInfo = Me.lvwEncVersions.HitTest(location)
+        If hit.Item Is Nothing OrElse hit.SubItem Is Nothing Then Return Nothing
+        If hit.Item.SubItems.IndexOf(hit.SubItem) <> EncDownloadColumn Then Return Nothing
+        Return TryCast(hit.SubItem.Tag, String)
+    End Function
+
+    Private Sub lvwEncVersions_MouseUp(sender As Object, e As System.Windows.Forms.MouseEventArgs)
+        If e.Button <> System.Windows.Forms.MouseButtons.Left Then Return
+        Dim address As String = EncDownloadAddressAt(e.Location)
+        If String.IsNullOrEmpty(address) Then Return
+        Try
+            Process.Start(address)
+        Catch ex As Exception
+            Plugin.LogError(ex, "EncodersTab.OpenDownloadPage", address)
+        End Try
+    End Sub
+
+    Private Sub lvwEncVersions_MouseMove(sender As Object, e As System.Windows.Forms.MouseEventArgs)
+        Dim wanted As System.Windows.Forms.Cursor = If(String.IsNullOrEmpty(EncDownloadAddressAt(e.Location)), System.Windows.Forms.Cursors.Default, System.Windows.Forms.Cursors.Hand)
+        If Me.lvwEncVersions.Cursor IsNot wanted Then Me.lvwEncVersions.Cursor = wanted
+    End Sub
+
+    ' Opens MusicBee's encoder folder in the file explorer (the place a newer program is copied to).
+    Private Sub btnEncOpenFolder_Click(sender As Object, e As EventArgs)
+        Dim folder As String = Plugin.EncoderVersions.CodecFolder()
+        Try
+            If System.IO.Directory.Exists(folder) Then
+                Process.Start("explorer.exe", """" & folder & """")
+            End If
+        Catch ex As Exception
+            Plugin.LogError(ex, "EncodersTab.OpenFolder", folder)
+        End Try
+    End Sub
+
+    Private Sub ShowEncoderVersions(entries As List(Of Plugin.EncoderVersions.Entry))
+        If Me.IsDisposed Then Return
+        Me.lvwEncVersions.BeginUpdate()
+        Me.lvwEncVersions.Items.Clear()
+        For Each en As Plugin.EncoderVersions.Entry In entries
+            Dim version As String
+            If Not en.Present Then
+                version = Plugin.L("EncNotInstalled")
+            ElseIf en.Version.Length = 0 Then
+                version = Plugin.L("EncVersionUnknown")
+            Else
+                version = en.Version
+            End If
+            Dim item As New System.Windows.Forms.ListViewItem(en.Format) With {.Tag = en}
+            item.SubItems.Add(en.FileName)
+            item.SubItems.Add(version)
+            item.SubItems.Add("")   ' the current version, filled when the published list arrives
+            item.SubItems.Add("")   ' the download page, filled with it
+            item.SubItems.Add(If(en.Bits = 0, "", en.Bits.ToString() & "-bit"))
+            If Not en.Present Then item.ForeColor = System.Drawing.SystemColors.GrayText
+            Me.lvwEncVersions.Items.Add(item)
+        Next en
+        Me.lvwEncVersions.EndUpdate()
+    End Sub
+
     Private Sub btnDbgTestEncoders_Click(sender As Object, e As EventArgs)
         Dim previousCursor As Cursor = Me.Cursor
         Me.Cursor = Cursors.WaitCursor
@@ -2216,6 +2352,15 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.tabUPnPPaths.Text = Plugin.L("tabUPnPPaths")
         Me.tabUPnPView.Text = Plugin.L("tabUPnPView")
         Me.tabDebug.Text = Plugin.L("tabDebug")
+        Me.tabEncoders.Text = Plugin.L("tabEncoders")
+        Me.lblEncIntro.Text = Plugin.L("lblEncIntro")
+        Me.colEncFormat.Text = Plugin.L("colEncFormat")
+        Me.colEncProgram.Text = Plugin.L("colEncProgram")
+        Me.colEncVersion.Text = Plugin.L("colEncVersion")
+        Me.colEncCurrent.Text = Plugin.L("colEncCurrent")
+        Me.colEncDownload.Text = Plugin.L("colEncDownload")
+        Me.colEncBuild.Text = Plugin.L("colEncBuild")
+        Me.btnEncOpenFolder.Text = Plugin.L("btnEncOpenFolder")
         Me.btnDbgClearLog.Text = Plugin.L("btnDbgClearLog")
         Me.btnDbgReadLastQuery.Text = Plugin.L("btnDbgReadLastQuery")
         Me.btnDbgXmlRun.Text = Plugin.L("btnDbgXmlRun")
@@ -2339,6 +2484,10 @@ Partial Friend NotInheritable Class SettingsDialog
         AddHandler Me.chkDevForceNativeStream.CheckedChanged, AddressOf chkDevForceNativeStream_CheckedChanged
         AddHandler Me.chkDevForceTranscoding.CheckedChanged, AddressOf chkDevForceTranscoding_CheckedChanged
         AddHandler Me.btnDbgTestEncoders.Click, AddressOf btnDbgTestEncoders_Click
+        AddHandler Me.tbcMain.SelectedIndexChanged, AddressOf tbcMain_EncodersTabShown
+        AddHandler Me.btnEncOpenFolder.Click, AddressOf btnEncOpenFolder_Click
+        AddHandler Me.lvwEncVersions.MouseUp, AddressOf lvwEncVersions_MouseUp
+        AddHandler Me.lvwEncVersions.MouseMove, AddressOf lvwEncVersions_MouseMove
         AddHandler Me.btnLibOptHierAdd.Click, AddressOf libOptHierAdd_Click
         AddHandler Me.btnLibOptHierRemove.Click, AddressOf libOptHierRemove_Click
         AddHandler Me.lstLibOptHierFields.SelectedIndexChanged, AddressOf libOptHierList_SelectionChanged

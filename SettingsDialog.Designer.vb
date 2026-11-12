@@ -131,6 +131,16 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.btnLibPthTemplateDown = New System.Windows.Forms.Button()
         Me.lstLibPthTemplate = New System.Windows.Forms.ListBox()
         Me.lblLibPthTemplate = New System.Windows.Forms.Label()
+        Me.tabEncoders = New System.Windows.Forms.TabPage()
+        Me.lblEncIntro = New System.Windows.Forms.Label()
+        Me.btnEncOpenFolder = New System.Windows.Forms.Button()
+        Me.lvwEncVersions = New System.Windows.Forms.ListView()
+        Me.colEncFormat = New System.Windows.Forms.ColumnHeader()
+        Me.colEncProgram = New System.Windows.Forms.ColumnHeader()
+        Me.colEncVersion = New System.Windows.Forms.ColumnHeader()
+        Me.colEncCurrent = New System.Windows.Forms.ColumnHeader()
+        Me.colEncDownload = New System.Windows.Forms.ColumnHeader()
+        Me.colEncBuild = New System.Windows.Forms.ColumnHeader()
         Me.tabDebug = New System.Windows.Forms.TabPage()
         Me.btnDbgTestEncoders = New System.Windows.Forms.Button()
         Me.chkDbgInfo = New System.Windows.Forms.CheckBox()
@@ -167,6 +177,7 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.tbcLibraryPaths.SuspendLayout()
         Me.tabUPnPPaths.SuspendLayout()
         Me.tabUPnPView.SuspendLayout()
+        Me.tabEncoders.SuspendLayout()
         Me.tabDebug.SuspendLayout()
         Me.SuspendLayout()
         '
@@ -177,6 +188,7 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.tbcMain.Controls.Add(Me.tabProfiles)
         Me.tbcMain.Controls.Add(Me.tabLibraryGeneral)
         Me.tbcMain.Controls.Add(Me.tabLibraryPaths)
+        Me.tbcMain.Controls.Add(Me.tabEncoders)
         Me.tbcMain.Controls.Add(Me.tabDebug)
         Me.tbcMain.Location = New System.Drawing.Point(13, 11)
         Me.tbcMain.Margin = New System.Windows.Forms.Padding(4)
@@ -1531,6 +1543,83 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.lblLibPthTemplate.Text = "Template:"
         Me.lblLibPthTemplate.Visible = False
         '
+        'tabEncoders
+        '
+        Me.tabEncoders.Controls.Add(Me.lblEncIntro)
+        Me.tabEncoders.Controls.Add(Me.btnEncOpenFolder)
+        Me.tabEncoders.Controls.Add(Me.lvwEncVersions)
+        Me.tabEncoders.Location = New System.Drawing.Point(4, 25)
+        Me.tabEncoders.Margin = New System.Windows.Forms.Padding(4)
+        Me.tabEncoders.Name = "tabEncoders"
+        Me.tabEncoders.Padding = New System.Windows.Forms.Padding(4)
+        Me.tabEncoders.Size = New System.Drawing.Size(1025, 474)
+        Me.tabEncoders.TabIndex = 5
+        Me.tabEncoders.Text = "Encoders"
+        Me.tabEncoders.UseVisualStyleBackColor = True
+        '
+        'lblEncIntro
+        '
+        Me.lblEncIntro.AutoSize = True
+        Me.lblEncIntro.Location = New System.Drawing.Point(8, 8)
+        Me.lblEncIntro.Name = "lblEncIntro"
+        Me.lblEncIntro.Size = New System.Drawing.Size(527, 17)
+        Me.lblEncIntro.TabIndex = 0
+        Me.lblEncIntro.Text = "The encoder programs MusicBee uses to convert a track, and the version of each:"
+        '
+        'btnEncOpenFolder
+        '
+        Me.btnEncOpenFolder.AutoSize = True
+        Me.btnEncOpenFolder.Location = New System.Drawing.Point(8, 440)
+        Me.btnEncOpenFolder.Name = "btnEncOpenFolder"
+        Me.btnEncOpenFolder.Size = New System.Drawing.Size(170, 27)
+        Me.btnEncOpenFolder.TabIndex = 1
+        Me.btnEncOpenFolder.Text = "Open encoders folder"
+        Me.btnEncOpenFolder.UseVisualStyleBackColor = True
+        '
+        'lvwEncVersions
+        '
+        Me.lvwEncVersions.Columns.AddRange(New System.Windows.Forms.ColumnHeader() {Me.colEncFormat, Me.colEncProgram, Me.colEncVersion, Me.colEncCurrent, Me.colEncDownload, Me.colEncBuild})
+        Me.lvwEncVersions.FullRowSelect = True
+        Me.lvwEncVersions.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.Nonclickable
+        Me.lvwEncVersions.HideSelection = False
+        Me.lvwEncVersions.Location = New System.Drawing.Point(8, 28)
+        Me.lvwEncVersions.MultiSelect = False
+        Me.lvwEncVersions.Name = "lvwEncVersions"
+        Me.lvwEncVersions.Size = New System.Drawing.Size(1010, 406)
+        Me.lvwEncVersions.TabIndex = 2
+        Me.lvwEncVersions.UseCompatibleStateImageBehavior = False
+        Me.lvwEncVersions.View = System.Windows.Forms.View.Details
+        '
+        'colEncFormat
+        '
+        Me.colEncFormat.Text = "Format"
+        Me.colEncFormat.Width = 130
+        '
+        'colEncProgram
+        '
+        Me.colEncProgram.Text = "Program"
+        Me.colEncProgram.Width = 170
+        '
+        'colEncVersion
+        '
+        Me.colEncVersion.Text = "Version"
+        Me.colEncVersion.Width = 190
+        '
+        'colEncCurrent
+        '
+        Me.colEncCurrent.Text = "Current"
+        Me.colEncCurrent.Width = 110
+        '
+        'colEncDownload
+        '
+        Me.colEncDownload.Text = "Download"
+        Me.colEncDownload.Width = 110
+        '
+        'colEncBuild
+        '
+        Me.colEncBuild.Text = "Build"
+        Me.colEncBuild.Width = 110
+        '
         'tabDebug
         '
         Me.tabDebug.Controls.Add(Me.btnDbgTestEncoders)
@@ -1817,6 +1906,8 @@ Partial Friend NotInheritable Class SettingsDialog
         Me.tabUPnPPaths.ResumeLayout(False)
         Me.tabUPnPPaths.PerformLayout()
         Me.tabUPnPView.ResumeLayout(False)
+        Me.tabEncoders.ResumeLayout(False)
+        Me.tabEncoders.PerformLayout()
         Me.tabDebug.ResumeLayout(False)
         Me.tabDebug.PerformLayout()
         Me.ResumeLayout(False)
@@ -1832,6 +1923,16 @@ Partial Friend NotInheritable Class SettingsDialog
     Private tabLibraryGeneral As System.Windows.Forms.TabPage
     Private tabLibraryPaths As System.Windows.Forms.TabPage
     Private tabDebug As System.Windows.Forms.TabPage
+    Private tabEncoders As System.Windows.Forms.TabPage
+    Private lblEncIntro As System.Windows.Forms.Label
+    Private WithEvents btnEncOpenFolder As System.Windows.Forms.Button
+    Private lvwEncVersions As System.Windows.Forms.ListView
+    Private colEncFormat As System.Windows.Forms.ColumnHeader
+    Private colEncProgram As System.Windows.Forms.ColumnHeader
+    Private colEncVersion As System.Windows.Forms.ColumnHeader
+    Private colEncCurrent As System.Windows.Forms.ColumnHeader
+    Private colEncDownload As System.Windows.Forms.ColumnHeader
+    Private colEncBuild As System.Windows.Forms.ColumnHeader
     Private WithEvents btnDbgClearLog As System.Windows.Forms.Button
     Private WithEvents btnDbgReadLastQuery As System.Windows.Forms.Button
     Private txtDbgXmlInput As System.Windows.Forms.TextBox

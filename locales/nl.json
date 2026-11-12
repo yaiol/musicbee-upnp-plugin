@@ -140,5 +140,18 @@
   "EncTestAllOk": "Alle uitvoerformaten werken.",
   "EncTestHint": "Een hierboven als niet werkend vermeld formaat zal als stilte worden afgespeeld op uw apparaat. Los dit op in MusicBee: Voorkeuren > Bestandsconverters, waar elk formaat zijn encoderlocatie en commandoregelparameters heeft (de Reset-knop herstelt de standaardinstellingen van MusicBee).",
   "EncTestCrashed": "{0}: de encoder is gecrasht ({1}) - de opdrachtregelparameters zijn waarschijnlijk onjuist",
-  "btnDbgTestEncoders": "Encoders testen"
+  "btnDbgTestEncoders": "Encoders testen",
+  "tabEncoders": "Encoders",
+  "lblEncIntro": "De encoderprogramma's die MusicBee gebruikt om een nummer te converteren, en de versie van elk:",
+  "colEncFormat": "Formaat",
+  "colEncProgram": "Programma",
+  "colEncVersion": "Versie",
+  "colEncBuild": "Build",
+  "EncReading": "Versies lezen…",
+  "EncNotInstalled": "niet geïnstalleerd",
+  "EncVersionUnknown": "onbekend",
+  "EncOpenPage": "Pagina openen",
+  "colEncCurrent": "Huidig",
+  "colEncDownload": "Downloaden",
+  "btnEncOpenFolder": "Map met encoders openen"
 }

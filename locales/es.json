@@ -140,5 +140,18 @@
   "EncTestAllOk": "Todos los formatos de salida están funcionando.",
   "EncTestHint": "Un formato listado arriba como no funcionando se reproducirá como silencio en su dispositivo. Arréglalo en MusicBee: Preferencias > Convertidores de archivos, donde cada formato tiene la ubicación de su codificador y sus parámetros de línea de comandos (el botón Restablecer restaura los valores predeterminados de MusicBee).",
   "EncTestCrashed": "{0}: el codificador falló ({1}) - sus parámetros de línea de comandos son probablemente incorrectos",
-  "btnDbgTestEncoders": "Probar codificadores"
+  "btnDbgTestEncoders": "Probar codificadores",
+  "tabEncoders": "Codificadores",
+  "lblEncIntro": "Los programas codificadores que MusicBee utiliza para convertir una pista, y la versión de cada uno:",
+  "colEncFormat": "Formato",
+  "colEncProgram": "Programa",
+  "colEncVersion": "Versión",
+  "colEncBuild": "Compilación",
+  "EncReading": "Leyendo las versiones…",
+  "EncNotInstalled": "no instalado",
+  "EncVersionUnknown": "desconocido",
+  "EncOpenPage": "Abrir página",
+  "colEncCurrent": "Actual",
+  "colEncDownload": "Descargar",
+  "btnEncOpenFolder": "Abrir carpeta de codificadores"
 }

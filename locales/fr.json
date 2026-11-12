@@ -140,5 +140,18 @@
   "EncTestAllOk": "Tous les formats de sortie fonctionnent.",
   "EncTestHint": "Un format listé ci-dessus comme ne fonctionnant pas sera lu comme du silence sur votre appareil. Corrigez-le dans MusicBee : Préférences > Convertisseurs de fichiers, où chaque format a l'emplacement de son encodeur et ses paramètres de ligne de commande (le bouton Réinitialiser restaure les paramètres par défaut de MusicBee).",
   "EncTestCrashed": "{0}: l'encodeur a planté ({1}) - ses paramètres de ligne de commande sont probablement incorrects",
-  "btnDbgTestEncoders": "Tester les encodeurs"
+  "btnDbgTestEncoders": "Tester les encodeurs",
+  "tabEncoders": "Encodeurs",
+  "lblEncIntro": "Les programmes d'encodage que MusicBee utilise pour convertir une piste, et la version de chacun :",
+  "colEncFormat": "Format",
+  "colEncProgram": "Programme",
+  "colEncVersion": "Version",
+  "colEncBuild": "Compilation",
+  "EncReading": "Lecture des versions…",
+  "EncNotInstalled": "non installé",
+  "EncVersionUnknown": "inconnu",
+  "EncOpenPage": "Ouvrir la page",
+  "colEncCurrent": "Actuel",
+  "colEncDownload": "Télécharger",
+  "btnEncOpenFolder": "Ouvrir le dossier des encodeurs"
 }

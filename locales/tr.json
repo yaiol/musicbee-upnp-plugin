@@ -140,5 +140,18 @@
   "EncTestAllOk": "Tüm çıkış biçimleri çalışıyor.",
   "EncTestHint": "Yukarıda çalışmıyor olarak listelenen bir biçim, cihazınızda sessizlik olarak çalacaktır. Bunu MusicBee'de düzeltin: Tercihler > Dosya Dönüştürücüler, burada her biçimin kodlayıcı konumu ve komut satırı parametreleri bulunur (Sıfırla düğmesi MusicBee'nin kendi varsayılanlarını geri yükler).",
   "EncTestCrashed": "{0}: kodlayıcı çöktü ({1}) - komut satırı parametreleri muhtemelen yanlış",
-  "btnDbgTestEncoders": "Kodlayıcıları Test Et"
+  "btnDbgTestEncoders": "Kodlayıcıları Test Et",
+  "tabEncoders": "Kodlayıcılar",
+  "lblEncIntro": "MusicBee'nin bir parçayı dönüştürmek için kullandığı kodlayıcı programlar ve her birinin sürümü:",
+  "colEncFormat": "Biçim",
+  "colEncProgram": "Program",
+  "colEncVersion": "Sürüm",
+  "colEncBuild": "Derleme",
+  "EncReading": "Sürümler okunuyor…",
+  "EncNotInstalled": "yüklü değil",
+  "EncVersionUnknown": "bilinmiyor",
+  "EncOpenPage": "Sayfayı aç",
+  "colEncCurrent": "Mevcut",
+  "colEncDownload": "İndir",
+  "btnEncOpenFolder": "Kodlayıcılar klasörünü aç"
 }

@@ -140,5 +140,18 @@
   "EncTestAllOk": "すべての出力形式が動作しています。",
   "EncTestHint": "上記で動作しないと表示されている形式は、デバイスで無音として再生されます。MusicBee の「環境設定 > ファイルコンバーター」で修正してください。各形式にはエンコーダーの場所とコマンドラインパラメーターがあります（「リセット」ボタンは MusicBee のデフォルト設定に戻します）。",
   "EncTestCrashed": "{0}: エンコーダーがクラッシュしました ({1}) - コマンドラインパラメータが間違っている可能性があります",
-  "btnDbgTestEncoders": "エンコーダーをテスト"
+  "btnDbgTestEncoders": "エンコーダーをテスト",
+  "tabEncoders": "エンコーダー",
+  "lblEncIntro": "MusicBeeがトラックの変換に使用するエンコーダープログラムと、それぞれのバージョン:",
+  "colEncFormat": "形式",
+  "colEncProgram": "プログラム",
+  "colEncVersion": "バージョン",
+  "colEncBuild": "ビルド",
+  "EncReading": "バージョンを読み込み中…",
+  "EncNotInstalled": "インストールされていません",
+  "EncVersionUnknown": "不明",
+  "EncOpenPage": "ページを開く",
+  "colEncCurrent": "現在",
+  "colEncDownload": "ダウンロード",
+  "btnEncOpenFolder": "エンコーダーフォルダーを開く"
 }

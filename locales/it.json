@@ -140,5 +140,18 @@
   "EncTestAllOk": "Tutti i formati di output funzionano.",
   "EncTestHint": "Un formato elencato sopra come non funzionante verrà riprodotto come silenzio sul tuo dispositivo. Correggilo in MusicBee: Preferenze > Convertitori di file, dove ogni formato ha la sua posizione dell'encoder e i suoi parametri della riga di comando (il pulsante Ripristina ripristina le impostazioni predefinite di MusicBee).",
   "EncTestCrashed": "{0}: il codificatore è andato in crash ({1}) - i suoi parametri della riga di comando sono probabilmente errati",
-  "btnDbgTestEncoders": "Testa codificatori"
+  "btnDbgTestEncoders": "Testa codificatori",
+  "tabEncoders": "Encoder",
+  "lblEncIntro": "I programmi encoder che MusicBee utilizza per convertire un brano, e la versione di ciascuno:",
+  "colEncFormat": "Formato",
+  "colEncProgram": "Programma",
+  "colEncVersion": "Versione",
+  "colEncBuild": "Compilazione",
+  "EncReading": "Lettura delle versioni…",
+  "EncNotInstalled": "non installato",
+  "EncVersionUnknown": "sconosciuto",
+  "EncOpenPage": "Apri pagina",
+  "colEncCurrent": "Attuale",
+  "colEncDownload": "Scarica",
+  "btnEncOpenFolder": "Apri cartella degli encoder"
 }

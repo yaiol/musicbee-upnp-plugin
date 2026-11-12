@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.2 — 2026-11-12
+
+- New Encoders tab in the settings: lists the encoder programs MusicBee uses to convert tracks, with the version installed on your machine, the current version each project publishes, and whether the program is a 32-bit or 64-bit build
+- An encoder that is older than the current version is highlighted, each row links to the encoder's download page, and a button opens MusicBee's encoder folder
+- README: corrected the current opus-tools version to 0.2
+
 ## 2.1.1 — 2026-11-11
 
 - Radio stations that have no folder in MusicBee now appear in the Radio container; they were left out, so a library whose stations had no folder showed an empty Radio

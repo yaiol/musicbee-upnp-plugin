@@ -140,5 +140,18 @@
   "EncTestAllOk": "Alla utdataformat fungerar.",
   "EncTestHint": "Ett format som listas ovan som inte fungerar kommer att spelas som tystnad på din enhet. Åtgärda det i MusicBee: Inställningar > Filkonverterare, där varje format har sin kodarplats och sina kommandoradsparametrar (knappen Återställ återställer MusicBees egna standardinställningar).",
   "EncTestCrashed": "{0}: kodaren kraschade ({1}) - dess kommandoradsparametrar är förmodligen felaktiga",
-  "btnDbgTestEncoders": "Testa kodare"
+  "btnDbgTestEncoders": "Testa kodare",
+  "tabEncoders": "Kodare",
+  "lblEncIntro": "Kodningsprogrammen som MusicBee använder för att konvertera ett spår, och versionen av varje:",
+  "colEncFormat": "Format",
+  "colEncProgram": "Program",
+  "colEncVersion": "Version",
+  "colEncBuild": "Bygge",
+  "EncReading": "Läser versionerna…",
+  "EncNotInstalled": "inte installerad",
+  "EncVersionUnknown": "okänd",
+  "EncOpenPage": "Öppna sida",
+  "colEncCurrent": "Aktuell",
+  "colEncDownload": "Ladda ner",
+  "btnEncOpenFolder": "Öppna kodarmapp"
 }

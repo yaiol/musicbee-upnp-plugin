@@ -140,5 +140,18 @@
   "EncTestAllOk": "Minden kimeneti formátum működik.",
   "EncTestHint": "A fent nem működőként felsorolt formátum csendként fog lejátszódni az eszközén. Javítsa ki a MusicBee-ben: Beállítások > Fájlkonverterek, ahol minden formátumhoz megadható a kódoló helye és a parancssori paraméterei (a Visszaállítás gomb visszaállítja a MusicBee saját alapértelmezett beállításait).",
   "EncTestCrashed": "{0}: a kódoló összeomlott ({1}) - a parancssori paraméterei valószínűleg hibásak",
-  "btnDbgTestEncoders": "Kódolók tesztelése"
+  "btnDbgTestEncoders": "Kódolók tesztelése",
+  "tabEncoders": "Kódolók",
+  "lblEncIntro": "A MusicBee által egy zeneszám konvertálásához használt kódoló programok és azok verziói:",
+  "colEncFormat": "Formátum",
+  "colEncProgram": "Program",
+  "colEncVersion": "Verzió",
+  "colEncBuild": "Összeállítás",
+  "EncReading": "Verziók olvasása…",
+  "EncNotInstalled": "nincs telepítve",
+  "EncVersionUnknown": "ismeretlen",
+  "EncOpenPage": "Oldal megnyitása",
+  "colEncCurrent": "Jelenlegi",
+  "colEncDownload": "Letöltés",
+  "btnEncOpenFolder": "Kódolók mappa megnyitása"
 }
